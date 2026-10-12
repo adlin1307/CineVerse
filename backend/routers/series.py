@@ -1,0 +1,73 @@
+from fastapi import APIRouter, HTTPException, Query
+from typing import Optional
+from services.tmdb_service import tmdb_service
+from services.mock_service import mock_service
+
+router = APIRouter(prefix="/api/series", tags=["series"])
+
+
+def get_service():
+    """Return the appropriate service (TMDB or mock)."""
+    return tmdb_service if tmdb_service.is_configured else mock_service
+
+
+@router.get("/popular")
+async def get_popular_series(page: int = Query(1, ge=1, le=500)):
+    """Get popular TV series."""
+    try:
+        service = get_service()
+        data = await service.get_popular_series(page=page)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/discover")
+async def discover_series(
+    page: int = Query(1, ge=1, le=500),
+    sort_by: str = Query("popularity.desc", regex="^(popularity|vote_average|first_air_date)\\.(asc|desc)$"),
+    with_genres: Optional[str] = None,
+    with_original_language: Optional[str] = None,
+    first_air_date_year: Optional[int] = Query(None, ge=1900, le=2100)
+):
+    """Discover TV series with filters."""
+    try:
+        if not tmdb_service.is_configured:
+            # For mock service, just return popular series
+            data = await mock_service.get_popular_series(page=page)
+            return data
+        
+        data = await tmdb_service.discover_series(
+            page=page,
+            sort_by=sort_by,
+            with_genres=with_genres,
+            with_original_language=with_original_language,
+            first_air_date_year=first_air_date_year
+        )
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{series_id}")
+async def get_series_details(series_id: int):
+    """Get detailed information about a specific TV series."""
+    try:
+        service = get_service()
+        data = await service.get_series_details(series_id)
+        return data
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/genres/list")
+async def get_series_genres():
+    """Get list of TV series genres."""
+    try:
+        service = get_service()
+        data = await service.get_genres_series()
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

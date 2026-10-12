@@ -1,0 +1,14 @@
+.watchlist-page .watchlist-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--spacing-lg);
+}
+
+.watchlist-page .empty-state {
+  margin-top: var(--spacing-3xl);
+}
+
+.watchlist-page .empty-state svg {
+  margin: 0 auto var(--spacing-xl);
+  color: var(--color-text-muted);
+}

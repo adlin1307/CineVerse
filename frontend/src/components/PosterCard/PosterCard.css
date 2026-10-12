@@ -1,0 +1,145 @@
+.poster-card {
+  display: block;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: all var(--transition-normal);
+  background: var(--color-bg-secondary);
+}
+
+.poster-card:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-xl);
+}
+
+.poster-image-container {
+  position: relative;
+  aspect-ratio: 2/3;
+  overflow: hidden;
+  background: var(--color-bg-tertiary);
+}
+
+.poster-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--transition-slow);
+}
+
+.poster-card:hover .poster-image {
+  transform: scale(1.05);
+}
+
+.poster-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: var(--spacing-lg);
+}
+
+.poster-placeholder span {
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.watchlist-button {
+  position: absolute;
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(15, 15, 15, 0.8);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  opacity: 0;
+  transition: all var(--transition-normal);
+  z-index: 10;
+}
+
+.poster-card:hover .watchlist-button {
+  opacity: 1;
+}
+
+.watchlist-button:hover {
+  background: rgba(212, 175, 55, 0.9);
+  color: var(--color-bg-primary);
+  transform: scale(1.1);
+}
+
+.watchlist-button.active {
+  opacity: 1;
+  background: var(--color-accent-gold);
+  color: var(--color-bg-primary);
+}
+
+.poster-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(15, 15, 15, 0.95) 0%, transparent 50%);
+  padding: var(--spacing-lg);
+  display: flex;
+  align-items: flex-end;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.poster-card:hover .poster-overlay {
+  opacity: 1;
+}
+
+.poster-overview {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.poster-info {
+  padding: var(--spacing-md);
+}
+
+.poster-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--color-text-primary);
+}
+
+.poster-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.poster-rating {
+  color: var(--color-accent-gold);
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .watchlist-button {
+    opacity: 1;
+  }
+  
+  .poster-overlay {
+    display: none;
+  }
+}

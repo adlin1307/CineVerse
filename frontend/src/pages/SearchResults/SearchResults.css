@@ -1,0 +1,13 @@
+.search-results-page .search-results-info {
+  margin-bottom: var(--spacing-lg);
+}
+
+.search-results-page .results-count {
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+
+.search-results-page .empty-state svg {
+  margin: 0 auto var(--spacing-xl);
+  color: var(--color-text-muted);
+}
