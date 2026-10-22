@@ -1,14 +1,18 @@
 .home-page {
   min-height: 100vh;
+  background: linear-gradient(to bottom, var(--color-bg-primary) 0%, #0a0a0a 100%);
 }
 
 /* Hero Section */
 .hero-section {
   position: relative;
-  height: 85vh;
+  height: 75vh;
+  min-height: 500px;
+  max-height: 700px;
   display: flex;
   align-items: center;
   overflow: hidden;
+  margin-bottom: var(--spacing-xl);
 }
 
 .hero-backdrop {
@@ -21,24 +25,33 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  animation: subtle-zoom 20s ease-in-out infinite alternate;
+}
+
+@keyframes subtle-zoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.05); }
 }
 
 .hero-backdrop::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    to right,
-    rgba(15, 15, 15, 0.95) 0%,
-    rgba(15, 15, 15, 0.8) 40%,
-    transparent 100%
-  ),
-  linear-gradient(
-    to top,
-    rgba(15, 15, 15, 1) 0%,
-    rgba(15, 15, 15, 0.5) 50%,
-    rgba(15, 15, 15, 0.8) 100%
-  );
+  background: 
+    linear-gradient(
+      to right,
+      rgba(15, 15, 15, 0.98) 0%,
+      rgba(15, 15, 15, 0.85) 35%,
+      rgba(15, 15, 15, 0.6) 60%,
+      transparent 100%
+    ),
+    linear-gradient(
+      to top,
+      rgba(15, 15, 15, 1) 0%,
+      rgba(15, 15, 15, 0.4) 40%,
+      rgba(15, 15, 15, 0.7) 100%
+    );
+  backdrop-filter: blur(1px);
 }
 
 .hero-content {
@@ -58,10 +71,24 @@
   font-size: 3.5rem;
   margin-bottom: var(--spacing-md);
   line-height: 1.1;
-  background: linear-gradient(135deg, var(--color-text-primary), var(--color-accent-gold));
+  font-weight: 700;
+  background: linear-gradient(135deg, #ffffff 0%, var(--color-accent-gold) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  text-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+  animation: fade-in-up 0.8s ease-out;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .hero-meta {
@@ -71,6 +98,7 @@
   margin-bottom: var(--spacing-lg);
   font-size: 0.95rem;
   color: var(--color-text-secondary);
+  animation: fade-in-up 0.8s ease-out 0.2s both;
 }
 
 .hero-rating {
@@ -86,15 +114,25 @@
   gap: var(--spacing-sm);
   flex-wrap: wrap;
   margin-bottom: var(--spacing-lg);
+  animation: fade-in-up 0.8s ease-out 0.3s both;
 }
 
 .genre-badge {
   padding: var(--spacing-xs) var(--spacing-md);
-  background: rgba(212, 175, 55, 0.15);
-  border: 1px solid rgba(212, 175, 55, 0.3);
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.25);
   border-radius: var(--radius-md);
   font-size: 0.85rem;
+  font-weight: 500;
   color: var(--color-accent-gold);
+  backdrop-filter: blur(10px);
+  transition: all var(--transition-fast);
+}
+
+.genre-badge:hover {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: var(--color-accent-gold);
+  transform: translateY(-2px);
 }
 
 .hero-overview {
@@ -106,27 +144,56 @@
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  animation: fade-in-up 0.8s ease-out 0.4s both;
 }
 
 .hero-actions {
   display: flex;
   gap: var(--spacing-md);
+  animation: fade-in-up 0.8s ease-out 0.5s both;
+}
+
+.hero-actions .btn {
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
 }
 
 /* Browse Sections */
 .browse-sections {
-  padding: var(--spacing-3xl) 0;
+  padding: var(--spacing-3xl) 0 var(--spacing-2xl);
   background: var(--color-bg-primary);
+  position: relative;
+}
+
+.browse-sections::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100px;
+  background: linear-gradient(to bottom, var(--color-bg-primary), transparent);
+  pointer-events: none;
 }
 
 .browse-container {
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 var(--spacing-lg);
+  position: relative;
+  z-index: 1;
 }
 
 /* Responsive */
 @media (max-width: 1024px) {
+  .hero-section {
+    height: 65vh;
+    min-height: 450px;
+  }
+  
   .hero-title {
     font-size: 2.5rem;
   }
@@ -138,7 +205,8 @@
 
 @media (max-width: 768px) {
   .hero-section {
-    height: 70vh;
+    height: 60vh;
+    min-height: 400px;
   }
   
   .hero-title {

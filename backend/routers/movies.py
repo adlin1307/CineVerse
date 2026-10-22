@@ -20,7 +20,11 @@ async def get_popular_movies(page: int = Query(1, ge=1, le=500)):
         data = await service.get_popular_movies(page=page)
         return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        error_detail = f"{type(e).__name__}: {str(e)}"
+        print(f"[ERROR] Popular movies failed: {error_detail}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 @router.get("/discover")
@@ -60,7 +64,11 @@ async def get_movie_details(movie_id: int):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        error_detail = f"{type(e).__name__}: {str(e)}"
+        print(f"[ERROR] Movie details failed for ID {movie_id}: {error_detail}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 @router.get("/genres/list")
@@ -72,3 +80,24 @@ async def get_movie_genres():
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{movie_id}/videos")
+async def get_movie_videos(movie_id: int):
+    """Get videos (trailers, teasers) for a specific movie."""
+    try:
+        if not tmdb_service.is_configured:
+            # Return empty results for mock service
+            return {"id": movie_id, "results": []}
+        
+        data = await tmdb_service.get_movie_videos(movie_id)
+        return data
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        import traceback
+        error_detail = f"{type(e).__name__}: {str(e)}"
+        print(f"[ERROR] Movie videos failed for ID {movie_id}: {error_detail}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=error_detail)
+

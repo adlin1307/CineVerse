@@ -71,3 +71,24 @@ async def get_series_genres():
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{series_id}/videos")
+async def get_series_videos(series_id: int):
+    """Get videos (trailers, teasers) for a specific TV series."""
+    try:
+        if not tmdb_service.is_configured:
+            # Return empty results for mock service
+            return {"id": series_id, "results": []}
+        
+        data = await tmdb_service.get_series_videos(series_id)
+        return data
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        import traceback
+        error_detail = f"{type(e).__name__}: {str(e)}"
+        print(f"[ERROR] Series videos failed for ID {series_id}: {error_detail}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=error_detail)
+

@@ -59,9 +59,36 @@
 
 .posters-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: var(--spacing-lg);
   margin-bottom: var(--spacing-2xl);
+  max-width: 100%;
+}
+
+/* Prevent cards from getting too large on wide screens */
+@media (min-width: 768px) {
+  .posters-grid {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .posters-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
+@media (min-width: 1440px) {
+  .posters-grid {
+    grid-template-columns: repeat(6, 1fr);
+    max-width: 1400px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .posters-grid {
+    grid-template-columns: repeat(7, 1fr);
+  }
 }
 
 .load-more-container {
@@ -90,7 +117,7 @@
   }
   
   .posters-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: var(--spacing-md);
   }
 }

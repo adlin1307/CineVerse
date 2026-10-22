@@ -99,6 +99,13 @@ button {
   transition: all var(--transition-normal);
 }
 
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-accent-gold);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -148,29 +155,60 @@ img {
   transition: all var(--transition-normal);
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--spacing-xs);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  pointer-events: none;
+}
+
+.btn:active::before {
+  opacity: 1;
 }
 
 .btn-primary {
   background: linear-gradient(135deg, var(--color-accent-gold), var(--color-accent-gold-hover));
   color: var(--color-bg-primary);
   box-shadow: var(--shadow-md);
+  font-weight: 600;
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
+  background: linear-gradient(135deg, var(--color-accent-gold-hover), var(--color-accent-gold));
+}
+
+.btn-primary:active {
+  transform: translateY(0);
 }
 
 .btn-secondary {
   background: var(--color-bg-elevated);
   color: var(--color-text-primary);
   border: 1px solid rgba(212, 175, 55, 0.2);
+  font-weight: 600;
 }
 
 .btn-secondary:hover {
   border-color: var(--color-accent-gold);
-  background: rgba(212, 175, 55, 0.1);
+  background: rgba(212, 175, 55, 0.15);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-secondary:active {
+  transform: translateY(0);
 }
 
 .btn-ghost {
@@ -186,18 +224,21 @@ img {
 /* Loading State */
 .loading {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   min-height: 400px;
+  gap: var(--spacing-lg);
 }
 
 .spinner {
-  width: 50px;
-  height: 50px;
-  border: 3px solid var(--color-bg-elevated);
+  width: 56px;
+  height: 56px;
+  border: 4px solid var(--color-bg-elevated);
   border-top-color: var(--color-accent-gold);
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: spin 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
 }
 
 @keyframes spin {
@@ -206,31 +247,79 @@ img {
   }
 }
 
+.loading-text {
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
 /* Empty State */
 .empty-state {
   text-align: center;
   padding: var(--spacing-3xl) var(--spacing-lg);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.empty-state-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto var(--spacing-xl);
+  color: var(--color-text-muted);
+  opacity: 0.5;
 }
 
 .empty-state h3 {
   color: var(--color-text-secondary);
   margin-bottom: var(--spacing-md);
+  font-size: 1.5rem;
+  font-weight: 600;
 }
 
 .empty-state p {
   color: var(--color-text-muted);
-  max-width: 500px;
+  font-size: 1rem;
+  line-height: 1.6;
   margin: 0 auto;
 }
 
 /* Error State */
 .error-message {
-  background: rgba(255, 59, 48, 0.1);
-  border: 1px solid rgba(255, 59, 48, 0.3);
-  color: #ff6b6b;
-  padding: var(--spacing-lg);
-  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(220, 38, 38, 0.08), rgba(239, 68, 68, 0.12));
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: #fca5a5;
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-lg);
   text-align: center;
+  max-width: 600px;
+  margin: var(--spacing-2xl) auto;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
+}
+
+.error-message p {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: var(--spacing-md);
+  color: #fecaca;
+}
+
+.error-message .btn {
+  margin-top: var(--spacing-md);
+  background: rgba(220, 38, 38, 0.15);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  color: #fca5a5;
+}
+
+.error-message .btn:hover {
+  background: rgba(220, 38, 38, 0.25);
+  border-color: rgba(220, 38, 38, 0.5);
+  transform: translateY(-2px);
 }
 
 /* Responsive */

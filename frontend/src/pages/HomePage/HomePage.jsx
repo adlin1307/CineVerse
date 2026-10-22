@@ -47,6 +47,7 @@ export default function HomePage() {
     return (
       <div className="loading">
         <div className="spinner"></div>
+        <p className="loading-text">Loading content...</p>
       </div>
     )
   }
@@ -55,8 +56,22 @@ export default function HomePage() {
     return (
       <div className="container section">
         <div className="error-message">
+          <svg 
+            className="error-icon" 
+            width="48" 
+            height="48" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2"
+            style={{ margin: '0 auto var(--spacing-md)' }}
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
           <p>{error}</p>
-          <button className="btn btn-primary" onClick={loadHomeData} style={{ marginTop: '1rem' }}>
+          <button className="btn btn-primary" onClick={loadHomeData}>
             Try Again
           </button>
         </div>

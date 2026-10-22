@@ -72,3 +72,33 @@ export async function getSeriesGenres() {
 export async function checkHealth() {
   return fetchAPI('/health');
 }
+
+// People
+export async function getPersonDetails(personId) {
+  return fetchAPI(`/api/people/${personId}`);
+}
+
+// Videos
+export async function getMovieVideos(movieId) {
+  return fetchAPI(`/api/movies/${movieId}/videos`);
+}
+
+export async function getSeriesVideos(seriesId) {
+  return fetchAPI(`/api/series/${seriesId}/videos`);
+}
+
+// Recommendations
+export async function getSituationAwareRecommendations(params) {
+  return fetchAPI('/api/recommendations/situation-aware', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+export async function getRecommendationOptions() {
+  return fetchAPI('/api/recommendations/options');
+}
+
+export async function getRecommendationGenres() {
+  return fetchAPI('/api/recommendations/genres');
+}

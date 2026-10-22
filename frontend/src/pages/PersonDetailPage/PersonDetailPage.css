@@ -1,0 +1,229 @@
+.person-detail-page {
+  min-height: 100vh;
+}
+
+.person-header {
+  background: linear-gradient(to bottom, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%);
+  padding: var(--spacing-3xl) 0 var(--spacing-2xl);
+}
+
+.person-header-content {
+  display: flex;
+  gap: var(--spacing-2xl);
+  align-items: flex-start;
+}
+
+.person-photo-container {
+  flex-shrink: 0;
+  width: 280px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+  background: var(--color-bg-tertiary);
+}
+
+.person-photo {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.person-photo-placeholder {
+  aspect-ratio: 2/3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  background: linear-gradient(135deg, var(--color-bg-tertiary) 0%, var(--color-bg-secondary) 100%);
+}
+
+.person-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.person-name {
+  font-size: 3rem;
+  margin-bottom: var(--spacing-md);
+  line-height: 1.1;
+}
+
+.person-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.person-department {
+  color: var(--color-accent-gold);
+  font-weight: 600;
+}
+
+.person-biography h2 {
+  font-size: 1.5rem;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-text-primary);
+}
+
+.person-biography p {
+  font-size: 1.05rem;
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+  white-space: pre-line;
+}
+
+.person-content {
+  padding: var(--spacing-2xl) 0;
+}
+
+.filmography-section {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.filmography-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-xl);
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+}
+
+.filmography-header h2 {
+  font-size: 2rem;
+  margin: 0;
+}
+
+.filmography-status {
+  padding: var(--spacing-md);
+  background: rgba(212, 175, 55, 0.08);
+  border-left: 3px solid var(--color-accent-gold);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-lg);
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--spacing-xl);
+  padding: var(--spacing-lg) 0;
+}
+
+.load-more-btn {
+  min-width: 200px;
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size: 1rem;
+}
+
+.credit-filters {
+  display: flex;
+  gap: var(--spacing-sm);
+  background: var(--color-bg-secondary);
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-lg);
+}
+
+.filter-btn {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: transparent;
+  transition: all var(--transition-fast);
+}
+
+.filter-btn:hover {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.filter-btn.active {
+  color: var(--color-bg-primary);
+  background: linear-gradient(135deg, var(--color-accent-gold), var(--color-accent-gold-hover));
+  font-weight: 600;
+}
+
+.filmography-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+@media (min-width: 768px) {
+  .filmography-grid {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .filmography-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+}
+
+@media (min-width: 1440px) {
+  .filmography-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .person-header-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .person-photo-container {
+    width: 240px;
+  }
+  
+  .person-name {
+    font-size: 2.5rem;
+  }
+  
+  .person-meta {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .person-header {
+    padding: var(--spacing-2xl) 0 var(--spacing-xl);
+  }
+  
+  .person-photo-container {
+    width: 200px;
+  }
+  
+  .person-name {
+    font-size: 2rem;
+  }
+  
+  .person-biography p {
+    font-size: 0.95rem;
+  }
+  
+  .filmography-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .credit-filters {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .filmography-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--spacing-md);
+  }
+}

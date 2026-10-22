@@ -6,6 +6,7 @@ import SeriesPage from './pages/SeriesPage/SeriesPage'
 import DetailPage from './pages/DetailPage/DetailPage'
 import WatchlistPage from './pages/WatchlistPage/WatchlistPage'
 import SearchResults from './pages/SearchResults/SearchResults'
+import PersonDetailPage from './pages/PersonDetailPage/PersonDetailPage'
 import './App.css'
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
           <Route path="/search" element={<SearchResults />} />
           <Route path="/movie/:id" element={<DetailPage mediaType="movie" />} />
           <Route path="/series/:id" element={<DetailPage mediaType="tv" />} />
+          <Route path="/person/:personId" element={<PersonDetailPage />} />
           <Route path="/watchlist" element={<WatchlistPage />} />
         </Routes>
       </main>

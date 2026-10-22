@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { getMovieDetails, getSeriesDetails } from '../../services/api'
+import { getMovieDetails, getSeriesDetails, getMovieVideos, getSeriesVideos } from '../../services/api'
 import { isInWatchlist, addToWatchlist, removeFromWatchlist } from '../../services/watchlist'
 import PosterRow from '../../components/PosterRow/PosterRow'
+import TrailerModal from '../../components/TrailerModal/TrailerModal'
 import './DetailPage.css'
 
 export default function DetailPage({ mediaType }) {
@@ -11,6 +12,9 @@ export default function DetailPage({ mediaType }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [inWatchlist, setInWatchlist] = useState(false)
+  const [trailerKey, setTrailerKey] = useState(null)
+  const [showTrailer, setShowTrailer] = useState(false)
+  const [loadingTrailer, setLoadingTrailer] = useState(false)
   
   useEffect(() => {
     loadDetails()
@@ -54,6 +58,51 @@ export default function DetailPage({ mediaType }) {
     
     checkWatchlist()
     window.dispatchEvent(new Event('watchlistUpdated'))
+  }
+  
+  const handleWatchTrailer = async () => {
+    if (trailerKey) {
+      setShowTrailer(true)
+      return
+    }
+    
+    try {
+      setLoadingTrailer(true)
+      const videosData = mediaType === 'movie' 
+        ? await getMovieVideos(id)
+        : await getSeriesVideos(id)
+      
+      const videos = videosData.results || []
+      
+      // Prefer official trailers
+      let trailer = videos.find(v => 
+        v.site === 'YouTube' && 
+        v.type === 'Trailer' && 
+        v.official === true
+      )
+      
+      // Fallback to any trailer
+      if (!trailer) {
+        trailer = videos.find(v => v.site === 'YouTube' && v.type === 'Trailer')
+      }
+      
+      // Fallback to any YouTube video
+      if (!trailer) {
+        trailer = videos.find(v => v.site === 'YouTube')
+      }
+      
+      if (trailer && trailer.key) {
+        setTrailerKey(trailer.key)
+        setShowTrailer(true)
+      } else {
+        alert('No trailer available for this title.')
+      }
+    } catch (err) {
+      console.error('Failed to load trailer:', err)
+      alert('Failed to load trailer. Please try again.')
+    } finally {
+      setLoadingTrailer(false)
+    }
   }
   
   if (loading) {
@@ -151,6 +200,13 @@ export default function DetailPage({ mediaType }) {
             
             <div className="detail-actions">
               <button 
+                className="btn btn-primary"
+                onClick={handleWatchTrailer}
+                disabled={loadingTrailer}
+              >
+                {loadingTrailer ? 'Loading...' : '▶ Watch Trailer'}
+              </button>
+              <button 
                 className={`btn ${inWatchlist ? 'btn-secondary' : 'btn-primary'}`}
                 onClick={handleWatchlistToggle}
               >
@@ -177,7 +233,15 @@ export default function DetailPage({ mediaType }) {
                 <h2>Cast</h2>
                 <div className="cast-grid">
                   {cast.map(person => (
-                    <div key={person.id} className="cast-card">
+                    <a 
+                      key={person.id} 
+                      href={`/person/${person.id}`}
+                      className="cast-card"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        window.location.href = `/person/${person.id}`
+                      }}
+                    >
                       <div className="cast-photo">
                         {person.profile_path ? (
                           <img
@@ -197,7 +261,7 @@ export default function DetailPage({ mediaType }) {
                       {person.character && (
                         <div className="cast-character">{person.character}</div>
                       )}
-                    </div>
+                    </a>
                   ))}
                 </div>
               </div>
@@ -254,6 +318,14 @@ export default function DetailPage({ mediaType }) {
           />
         )}
       </div>
+      
+      {showTrailer && trailerKey && (
+        <TrailerModal
+          videoKey={trailerKey}
+          title={title}
+          onClose={() => setShowTrailer(false)}
+        />
+      )}
     </div>
   )
 }
