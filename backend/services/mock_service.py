@@ -204,7 +204,11 @@ class MockDataService:
     
     async def get_trending(self, media_type: str = "all", time_window: str = "week") -> Dict[str, Any]:
         """Get mock trending content."""
-        all_content = self.mock_movies[:4] + self.mock_series[:2]
+        all_content = [
+            {**m, "media_type": "movie"} for m in self.mock_movies[:4]
+        ] + [
+            {**s, "media_type": "tv"} for s in self.mock_series[:2]
+        ]
         return {
             "page": 1,
             "results": all_content,

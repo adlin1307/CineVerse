@@ -7,10 +7,19 @@ class TMDBService:
     """Service for interacting with The Movie Database (TMDB) API."""
     
     def __init__(self):
-        self.api_key = settings.tmdb_api_key
         self.base_url = settings.tmdb_base_url
         self.image_base_url = "https://image.tmdb.org/t/p/"
-        self.is_configured = self.api_key and self.api_key != "your_api_key_here"
+        self._api_key_override = None
+        
+    @property
+    def api_key(self) -> str:
+        if self._api_key_override is not None:
+            return self._api_key_override
+        return settings.tmdb_api_key
+        
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_key and self.api_key != "your_api_key_here")
         
         # Configure timeouts and limits to prevent connection issues
         self.timeout = httpx.Timeout(

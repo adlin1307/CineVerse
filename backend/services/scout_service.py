@@ -225,6 +225,7 @@ class ScoutService:
                 "runtime_preference": constraints.runtime_preference,
                 "popularity": constraints.popularity,
                 "min_year": constraints.min_year,
+                "max_year": constraints.max_year,
                 "previous_recommendation_ids": previous_ids,
                 "request_type": parsed_intent.request_type.value,
                 "is_surprise": is_surprise
@@ -492,6 +493,7 @@ class ScoutService:
             else:
                 media_type = MediaType.MOVIE
             min_year = preferences.get("min_year")
+            max_year = preferences.get("max_year")
             provider_id = preferences.get("provider_id")
             watch_region = preferences.get("watch_region", "US")
             sub_intent = preferences.get("emotional_sub_intent")
@@ -511,6 +513,8 @@ class ScoutService:
                 watch_region=watch_region,
                 runtime_preference=runtime_pref,
                 popularity=popularity,
+                min_year=min_year,
+                max_year=max_year,
                 count=3
             )
             
@@ -530,7 +534,8 @@ class ScoutService:
                     previous_ids if is_refinement else None,
                     popularity=popularity,
                     is_surprise=is_surprise,
-                    user_expressed_mood=user_expressed_mood
+                    user_expressed_mood=user_expressed_mood,
+                    max_year=max_year
                 )
                 results.extend(movies)
                 
@@ -541,7 +546,8 @@ class ScoutService:
                     previous_ids if is_refinement else None,
                     popularity=popularity,
                     is_surprise=is_surprise,
-                    user_expressed_mood=user_expressed_mood
+                    user_expressed_mood=user_expressed_mood,
+                    max_year=max_year
                 )
                 results.extend(tv_results)
             
@@ -597,7 +603,8 @@ class ScoutService:
         previous_ids: Optional[List[int]] = None,
         popularity: Optional[str] = None,
         is_surprise: bool = False,
-        user_expressed_mood: bool = False
+        user_expressed_mood: bool = False,
+        max_year: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Fetch movie recommendations."""
         try:
@@ -652,8 +659,13 @@ class ScoutService:
                     params["with_genres"] = genre_str
                 if exclude_genres:
                     params["without_genres"] = ",".join(str(g) for g in exclude_genres)
-                if min_year:
+                if min_year and max_year and min_year == max_year:
                     params["year"] = min_year
+                else:
+                    if min_year:
+                        params["primary_release_date.gte"] = f"{min_year}-01-01"
+                    if max_year:
+                        params["primary_release_date.lte"] = f"{max_year}-12-31"
                 if provider_id:
                     params["with_watch_providers"] = provider_id
                     params["watch_region"] = watch_region
@@ -689,7 +701,7 @@ class ScoutService:
                     from services.mock_service import mock_service
                     candidates = mock_service.mock_movies
             
-            # Filter candidates against exclusions and inclusions
+            # Filter candidates against exclusions, inclusions, and year constraints
             filtered = []
             for m in candidates:
                 g_ids = set(m.get("genre_ids", []))
@@ -697,6 +709,21 @@ class ScoutService:
                     continue
                 if include_genres and g_ids and not (g_ids & set(include_genres)):
                     continue
+                
+                # Filter by release year
+                rel_date = m.get("release_date") or m.get("first_air_date") or ""
+                if rel_date and len(rel_date) >= 4:
+                    try:
+                        m_year = int(rel_date[:4])
+                        if min_year and m_year < min_year:
+                            continue
+                        if max_year and m_year > max_year:
+                            continue
+                    except ValueError:
+                        pass
+                elif min_year or max_year:
+                    continue
+
                 filtered.append(m)
             
             # Deprioritize/exclude previous recommendations during refinements
@@ -755,7 +782,8 @@ class ScoutService:
         previous_ids: Optional[List[int]] = None,
         popularity: Optional[str] = None,
         is_surprise: bool = False,
-        user_expressed_mood: bool = False
+        user_expressed_mood: bool = False,
+        max_year: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Fetch TV series recommendations."""
         try:
@@ -796,8 +824,13 @@ class ScoutService:
                 params["with_genres"] = "18"
             if exclude_genres:
                 params["without_genres"] = ",".join(str(g) for g in exclude_genres)
-            if min_year:
+            if min_year and max_year and min_year == max_year:
                 params["first_air_date_year"] = min_year
+            else:
+                if min_year:
+                    params["first_air_date.gte"] = f"{min_year}-01-01"
+                if max_year:
+                    params["first_air_date.lte"] = f"{max_year}-12-31"
             if provider_id:
                 params["with_watch_providers"] = provider_id
                 params["watch_region"] = watch_region
@@ -810,6 +843,7 @@ class ScoutService:
                 from services.mock_service import mock_service
                 candidates = mock_service.mock_series
             
+            # Filter candidates against exclusions, inclusions, and year constraints
             filtered = []
             for tv in candidates:
                 g_ids = set(tv.get("genre_ids", []))
@@ -817,6 +851,21 @@ class ScoutService:
                     continue
                 if include_genres and g_ids and not (g_ids & set(include_genres)):
                     continue
+                
+                # Filter by air date
+                air_date = tv.get("first_air_date") or tv.get("release_date") or ""
+                if air_date and len(air_date) >= 4:
+                    try:
+                        tv_year = int(air_date[:4])
+                        if min_year and tv_year < min_year:
+                            continue
+                        if max_year and tv_year > max_year:
+                            continue
+                    except ValueError:
+                        pass
+                elif min_year or max_year:
+                    continue
+
                 filtered.append(tv)
                 
             # Deprioritize/exclude previous recommendations during refinements

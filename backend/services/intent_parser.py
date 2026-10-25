@@ -415,9 +415,10 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             if tone_mood and not mood:
                 mood = tone_mood
         
-        # 11. Detect runtime & popularity
+        # 11. Detect runtime, popularity & release years
         runtime_pref = self._extract_runtime(message_lower)
         popularity = self._extract_popularity(message_lower)
+        min_year, max_year = self._extract_year_range(message_lower)
         
         # 12. Detect request type
         request_type = self._detect_request_type(
@@ -455,6 +456,8 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             provider_id=provider_id,
             provider_name=provider_name,
             watch_region=watch_region,
+            min_year=min_year,
+            max_year=max_year,
             runtime_preference=runtime_pref,
             language=language,
             popularity=popularity,
@@ -877,18 +880,18 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
         }
         
         negative_patterns = [
-            r'\bno\s+',
+            r'\bno\s+(?:any\s+)?',
             r'\bnothing\s+with\s+',
-            r'\bwithout\s+',
-            r'\bexclude\s+',
-            r'\bskip\s+',
-            r'\bnot\s+',
+            r'\bwithout\s+(?:any\s+)?',
+            r'\bexclude\s+(?:any\s+)?',
+            r'\bskip\s+(?:any\s+)?',
+            r'\bnot\s+(?:any\s+)?',
             r'\bhate\s+',
-            r'\bavoid\s+',
-            r'\bleave\s+out\s+',
+            r'\bavoid\s+(?:any\s+)?',
+            r'\bleave\s+out\s+(?:any\s+)?',
             r'\bno\s+more\s+',
-            r'\bdon\'?t\s+want\s+',
-            r'\bdo\s+not\s+want\s+',
+            r'\bdon\'?t\s+want\s+(?:any\s+)?',
+            r'\bdo\s+not\s+want\s+(?:any\s+)?',
             r'\bzero\s+',
             r'\bnever\s+',
             r'\bno\b(?:\s+\w+){0,3}\s+with\s+'
@@ -1097,6 +1100,87 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             if re.search(rf'\b{word}\b', message_lower):
                 return code, region
         return None, None
+
+    def _extract_year_range(self, message_lower: str) -> Tuple[Optional[int], Optional[int]]:
+        """
+        Extract release year constraints (min_year, max_year).
+        Supports:
+        - "after 2020", "post 2020", "since 2020"
+        - "before 2000", "pre 2000", "prior to 2010"
+        - "between 2010 and 2020", "from 2010 to 2020"
+        - "90s", "80s", "70s", "2000s", "2010s", "2020s"
+        - "released in 1910", "from 1910", "made in 1994"
+        """
+        # 1. Between range: "between 2010 and 2020", "from 2010 to 2020"
+        between_match = re.search(
+            r'\b(?:between|from)\s+(19\d\d|20[0-9]\d)\s+(?:and|to)\s+(19\d\d|20[0-9]\d)\b',
+            message_lower
+        )
+        if between_match:
+            y1, y2 = int(between_match.group(1)), int(between_match.group(2))
+            return (min(y1, y2), max(y1, y2))
+        
+        # 2. Decades
+        decade_map = {
+            r'\b(?:the\s+)?(?:\'|19)?70s\b': (1970, 1979),
+            r'\b(?:the\s+)?(?:\'|19)?80s\b': (1980, 1989),
+            r'\b(?:the\s+)?(?:\'|19)?90s\b': (1990, 1999),
+            r'\b(?:the\s+)?(?:20)?00s\b': (2000, 2009),
+            r'\b(?:the\s+)?(?:20)?10s\b': (2010, 2019),
+            r'\b(?:the\s+)?(?:20)?20s\b': (2020, 2029),
+        }
+        for pat, (d_min, d_max) in decade_map.items():
+            if re.search(pat, message_lower):
+                return (d_min, d_max)
+
+        # 3. After / Post / Since
+        after_match = re.search(
+            r'\b(?:released\s+)?(?:after|post|since|newer\s+than)\s+(19\d\d|20[0-9]\d)\b',
+            message_lower
+        )
+        if after_match:
+            year = int(after_match.group(1))
+            if "since" in message_lower:
+                return (year, None)
+            return (year + 1, None)
+        
+        # 4. Before / Pre / Prior to
+        before_match = re.search(
+            r'\b(?:released\s+)?(?:before|pre|prior\s+to|older\s+than)\s+(19\d\d|20[0-9]\d)\b',
+            message_lower
+        )
+        if before_match:
+            year = int(before_match.group(1))
+            return (None, year - 1)
+
+        # 5. Exact year: "released in 1910", "made in 1994", "from 1910", "in the year 2021"
+        exact_match = re.search(
+            r'\b(?:released\s+in|made\s+in|from\s+the\s+year|from\s+year|in\s+the\s+year|from)\s+(19\d\d|20[0-9]\d)\b',
+            message_lower
+        )
+        if exact_match:
+            year = int(exact_match.group(1))
+            return (year, year)
+
+        # 6. "in <year>"
+        in_match = re.search(
+            r'\b(?:released\s+)?in\s+(19\d\d|20[0-9]\d)\b',
+            message_lower
+        )
+        if in_match:
+            year = int(in_match.group(1))
+            return (year, year)
+
+        # 7. Standalone year before a media word: "1910 movie", "2023 film", "2022 thriller"
+        standalone_match = re.search(
+            r'\b(19\d\d|20[0-9]\d)\s+(?:movie|movies|film|films|cinema|thriller|comedy|drama|action|horror|show|series)\b',
+            message_lower
+        )
+        if standalone_match:
+            year = int(standalone_match.group(1))
+            return (year, year)
+
+        return (None, None)
 
     def _check_creator_query(self, message_lower: str, raw_user_message: str) -> Optional[ParsedIntent]:
         """Check for director/creator/actor specific questions."""

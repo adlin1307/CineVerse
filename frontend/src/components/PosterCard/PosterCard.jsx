@@ -4,7 +4,13 @@ import { isInWatchlist, addToWatchlist, removeFromWatchlist } from '../../servic
 import './PosterCard.css'
 
 export default function PosterCard({ item, mediaType }) {
-  const type = mediaType || item.media_type || 'movie'
+  const resolveMediaType = () => {
+    if (mediaType && mediaType !== 'mixed') return mediaType
+    if (item.media_type) return item.media_type
+    if (item.first_air_date || item.name) return 'tv'
+    return 'movie'
+  }
+  const type = resolveMediaType()
   const title = item.title || item.name
   const releaseDate = item.release_date || item.first_air_date
   const posterPath = item.poster_path
