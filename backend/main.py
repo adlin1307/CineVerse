@@ -37,13 +37,16 @@ app = FastAPI(
 )
 
 # Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_kwargs = {
+    "allow_origins": settings.allowed_origins,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+if getattr(settings, "allow_origin_regex", None):
+    cors_kwargs["allow_origin_regex"] = settings.allow_origin_regex
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 # Include routers
 app.include_router(movies_router)

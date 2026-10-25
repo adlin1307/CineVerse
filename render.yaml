@@ -1,0 +1,46 @@
+services:
+  # CineVerse Backend API (FastAPI)
+  - type: web
+    name: cineverse-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: TMDB_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: WATCH_REGION
+        value: IN
+      - key: ALLOWED_ORIGINS
+        value: "http://localhost:5173,https://cineverse-web.onrender.com"
+      - key: ALLOW_ORIGIN_REGEX
+        value: "https://.*\\.vercel\\.app|https://.*\\.onrender\\.com|https://.*\\.netlify\\.app"
+
+  # CineVerse Frontend (React / Vite)
+  - type: web
+    name: cineverse-web
+    runtime: static
+    rootDir: frontend
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: cineverse-api
+          property: host
