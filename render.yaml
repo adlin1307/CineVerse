@@ -23,7 +23,7 @@ services:
       - key: ALLOWED_ORIGINS
         value: "http://localhost:5173,https://cineverse-web.onrender.com"
       - key: ALLOW_ORIGIN_REGEX
-        value: "https://.*\\.vercel\\.app|https://.*\\.onrender\\.com|https://.*\\.netlify\\.app"
+        value: 'https://.*\.vercel\.app|https://.*\.onrender\.com|https://.*\.netlify\.app'
 
   # CineVerse Frontend (React / Vite)
   - type: web
@@ -40,7 +40,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_BASE_URL
-        fromService:
-          type: web
-          name: cineverse-api
-          property: host
+        value: https://cineverse-api.onrender.com
