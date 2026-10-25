@@ -19,13 +19,14 @@ async def get_popular_series(page: int = Query(1, ge=1, le=500)):
         data = await service.get_popular_series(page=page)
         return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[ERROR] Popular series failed: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve popular series. Please try again later.")
 
 
 @router.get("/discover")
 async def discover_series(
     page: int = Query(1, ge=1, le=500),
-    sort_by: str = Query("popularity.desc", regex="^(popularity|vote_average|first_air_date)\\.(asc|desc)$"),
+    sort_by: str = Query("popularity.desc", pattern="^(popularity|vote_average|first_air_date)\\.(asc|desc)$"),
     with_genres: Optional[str] = None,
     with_original_language: Optional[str] = None,
     first_air_date_year: Optional[int] = Query(None, ge=1900, le=2100)
@@ -46,7 +47,8 @@ async def discover_series(
         )
         return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[ERROR] Discover series failed: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to discover TV series. Please try again later.")
 
 
 @router.get("/{series_id}")
@@ -59,7 +61,8 @@ async def get_series_details(series_id: int):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[ERROR] Series details failed for ID {series_id}: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve TV series details. Please try again later.")
 
 
 @router.get("/genres/list")
@@ -70,7 +73,8 @@ async def get_series_genres():
         data = await service.get_genres_series()
         return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[ERROR] Series genres failed: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve series genres. Please try again later.")
 
 
 @router.get("/{series_id}/videos")
@@ -87,8 +91,7 @@ async def get_series_videos(series_id: int):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         import traceback
-        error_detail = f"{type(e).__name__}: {str(e)}"
-        print(f"[ERROR] Series videos failed for ID {series_id}: {error_detail}")
+        print(f"[ERROR] Series videos failed for ID {series_id}: {type(e).__name__}: {str(e)}")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=error_detail)
+        raise HTTPException(status_code=500, detail="Failed to retrieve series videos. Please try again later.")
 

@@ -329,5 +329,52 @@ class MockDataService:
         """Get mock series genres."""
         return await self.get_genres_movies()
 
+    async def get_person_details(self, person_id: int) -> Dict[str, Any]:
+        """Get mock person details with movie and TV credits."""
+        mock_people = {
+            1: {"name": "Sarah Chen", "known_for_department": "Acting", "biography": "Sarah Chen is an acclaimed international actress known for compelling dramatic roles and gripping historical thrillers.", "birthday": "1988-04-12", "place_of_birth": "Vancouver, Canada"},
+            2: {"name": "Marcus Johnson", "known_for_department": "Acting", "biography": "Marcus Johnson is a versatile performer who has starred in critically acclaimed sci-fi epics and indie dramas.", "birthday": "1985-09-24", "place_of_birth": "Chicago, Illinois, USA"},
+            3: {"name": "Jane Director", "known_for_department": "Directing", "biography": "Jane Director is a visionary filmmaker celebrated for atmospheric world-building and narrative depth.", "birthday": "1979-11-03", "place_of_birth": "London, UK"},
+            4: {"name": "Emma Stone", "known_for_department": "Acting", "biography": "Emma Stone is an Academy Award-winning actress renowned for her range across comedies, musicals, and dramas.", "birthday": "1988-11-06", "place_of_birth": "Scottsdale, Arizona, USA"},
+            5: {"name": "Cillian Murphy", "known_for_department": "Acting", "biography": "Cillian Murphy is an Irish actor celebrated for transformative performances across stage and screen, including his Oscar-winning turn in Oppenheimer.", "birthday": "1976-05-25", "place_of_birth": "Douglas, Cork, Ireland"},
+            6: {"name": "Christopher Nolan", "known_for_department": "Directing", "biography": "Christopher Nolan is an acclaimed British-American director known for mind-bending blockbusters, practical effects, and non-linear storytelling.", "birthday": "1970-07-30", "place_of_birth": "London, UK"},
+        }
+        
+        person_info = mock_people.get(person_id, {
+            "name": f"Mock Artist #{person_id}",
+            "known_for_department": "Acting",
+            "biography": "A seasoned cinema and television professional with a diverse portfolio of acclaimed projects.",
+            "birthday": "1985-01-01",
+            "place_of_birth": "Los Angeles, California, USA"
+        })
+        
+        return {
+            "id": person_id,
+            "name": person_info["name"],
+            "biography": person_info["biography"],
+            "birthday": person_info["birthday"],
+            "place_of_birth": person_info["place_of_birth"],
+            "profile_path": None,
+            "known_for_department": person_info["known_for_department"],
+            "popularity": 45.2,
+            "movie_credits": {
+                "cast": [
+                    {**m, "character": "Lead Role", "media_type": "movie"}
+                    for m in self.mock_movies[:4]
+                ],
+                "crew": [
+                    {**m, "job": "Director" if person_info["known_for_department"] == "Directing" else "Producer", "media_type": "movie"}
+                    for m in self.mock_movies[4:6]
+                ]
+            },
+            "tv_credits": {
+                "cast": [
+                    {**s, "character": "Main Cast", "episode_count": 12, "media_type": "tv"}
+                    for s in self.mock_series[:2]
+                ],
+                "crew": []
+            }
+        }
+
 
 mock_service = MockDataService()

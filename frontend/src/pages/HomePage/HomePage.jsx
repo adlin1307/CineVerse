@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { getTrending, getPopularMovies, getPopularSeries } from '../../services/api'
+import { isInWatchlist, addToWatchlist, removeFromWatchlist } from '../../services/watchlist'
 import PosterRow from '../../components/PosterRow/PosterRow'
 import './HomePage.css'
 
@@ -127,6 +128,29 @@ function HeroSection({ featured }) {
     27: "Horror", 10402: "Music", 9648: "Mystery", 10749: "Romance", 878: "Sci-Fi",
     10770: "TV Movie", 53: "Thriller", 10752: "War", 37: "Western"
   }
+
+  const [inWatchlist, setInWatchlist] = useState(() => isInWatchlist(featured.id, mediaType))
+
+  useEffect(() => {
+    setInWatchlist(isInWatchlist(featured.id, mediaType))
+    const handleUpdate = () => setInWatchlist(isInWatchlist(featured.id, mediaType))
+    window.addEventListener('watchlistUpdated', handleUpdate)
+    return () => window.removeEventListener('watchlistUpdated', handleUpdate)
+  }, [featured.id, mediaType])
+
+  const handleWatchlistToggle = () => {
+    if (inWatchlist) {
+      removeFromWatchlist(featured.id, mediaType)
+      setInWatchlist(false)
+    } else {
+      addToWatchlist({
+        ...featured,
+        media_type: mediaType
+      })
+      setInWatchlist(true)
+    }
+    window.dispatchEvent(new Event('watchlistUpdated'))
+  }
   
   return (
     <section className="hero-section">
@@ -175,8 +199,11 @@ function HeroSection({ featured }) {
             <Link to={detailPath} className="btn btn-primary">
               Explore Title
             </Link>
-            <button className="btn btn-secondary">
-              Add to Watchlist
+            <button 
+              className={`btn ${inWatchlist ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={handleWatchlistToggle}
+            >
+              {inWatchlist ? '✓ In Watchlist' : '+ Add to Watchlist'}
             </button>
           </div>
         </div>
