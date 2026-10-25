@@ -115,17 +115,7 @@ async def scout_chat(request: ChatRequest):
     **Note:** Requires GEMINI_API_KEY to be configured in backend/.env
     """
     try:
-        # Check if Scout service is configured
-        if not scout_service.gemini_configured:
-            raise HTTPException(
-                status_code=503,
-                detail=(
-                    "Scout is not configured. The Gemini API key is required. "
-                    "Please set GEMINI_API_KEY in the backend/.env file."
-                )
-            )
-        
-        # Process message with Scout
+        # Process message with Scout (supports both Gemini LLM and deterministic fallback engine)
         result = await scout_service.process_message(
             user_message=request.message,
             conversation_history=[

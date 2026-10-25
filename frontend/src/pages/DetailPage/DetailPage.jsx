@@ -4,6 +4,7 @@ import { getMovieDetails, getSeriesDetails, getMovieVideos, getSeriesVideos } fr
 import { isInWatchlist, addToWatchlist, removeFromWatchlist } from '../../services/watchlist'
 import PosterRow from '../../components/PosterRow/PosterRow'
 import TrailerModal from '../../components/TrailerModal/TrailerModal'
+import CineImage from '../../components/CineImage/CineImage'
 import './DetailPage.css'
 
 export default function DetailPage({ mediaType }) {
@@ -141,28 +142,25 @@ export default function DetailPage({ mediaType }) {
       {/* Hero Section */}
       <div className="detail-hero">
         <div className="detail-backdrop">
-          {details.backdrop_path ? (
-            <img
-              src={`https://image.tmdb.org/t/p/original${details.backdrop_path}`}
-              alt={title}
-            />
-          ) : (
-            <div style={{ background: 'var(--color-bg-secondary)', width: '100%', height: '100%' }} />
-          )}
+          <CineImage
+            src={details.backdrop_path ? `https://image.tmdb.org/t/p/original${details.backdrop_path}` : null}
+            alt={title}
+            title={title}
+            year={year}
+            variant="backdrop"
+            showTitleInFallback={false}
+          />
         </div>
         
         <div className="detail-hero-content">
           <div className="detail-poster">
-            {details.poster_path ? (
-              <img
-                src={`https://image.tmdb.org/t/p/w500${details.poster_path}`}
-                alt={title}
-              />
-            ) : (
-              <div className="detail-poster-placeholder">
-                <span>No poster available</span>
-              </div>
-            )}
+            <CineImage
+              src={details.poster_path ? `https://image.tmdb.org/t/p/w500${details.poster_path}` : null}
+              alt={title}
+              title={title}
+              year={year}
+              variant="poster"
+            />
           </div>
           
           <div className="detail-info">
@@ -239,19 +237,13 @@ export default function DetailPage({ mediaType }) {
                       className="cast-card"
                     >
                       <div className="cast-photo">
-                        {person.profile_path ? (
-                          <img
-                            src={`https://image.tmdb.org/t/p/w185${person.profile_path}`}
-                            alt={person.name}
-                          />
-                        ) : (
-                          <div className="cast-photo-placeholder">
-                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                              <circle cx="12" cy="7" r="4" />
-                            </svg>
-                          </div>
-                        )}
+                        <CineImage
+                          src={person.profile_path ? `https://image.tmdb.org/t/p/w185${person.profile_path}` : null}
+                          alt={person.name}
+                          title={person.name}
+                          variant="profile"
+                          showTitleInFallback={false}
+                        />
                       </div>
                       <div className="cast-name">{person.name}</div>
                       {person.character && (

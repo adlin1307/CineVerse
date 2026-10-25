@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { getTrending, getPopularMovies, getPopularSeries } from '../../services/api'
 import { isInWatchlist, addToWatchlist, removeFromWatchlist } from '../../services/watchlist'
 import PosterRow from '../../components/PosterRow/PosterRow'
+import CineImage from '../../components/CineImage/CineImage'
 import './HomePage.css'
 
 export default function HomePage() {
@@ -155,14 +156,14 @@ function HeroSection({ featured }) {
   return (
     <section className="hero-section">
       <div className="hero-backdrop">
-        {backdropPath ? (
-          <img
-            src={`https://image.tmdb.org/t/p/original${backdropPath}`}
-            alt={title}
-          />
-        ) : (
-          <div style={{ background: 'var(--color-bg-secondary)', width: '100%', height: '100%' }} />
-        )}
+        <CineImage
+          src={backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : null}
+          alt={title}
+          title={title}
+          year={year}
+          variant="backdrop"
+          showTitleInFallback={false}
+        />
       </div>
       
       <div className="hero-content">

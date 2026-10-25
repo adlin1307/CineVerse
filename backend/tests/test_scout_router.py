@@ -88,17 +88,21 @@ class TestScoutChatEndpoint:
         assert len(call_args[1]["conversation_history"]) == 2
     
     @patch('routers.scout.scout_service')
-    def test_chat_unconfigured_returns_503(self, mock_service):
-        """Test that unconfigured Scout returns 503 service unavailable."""
+    def test_chat_unconfigured_uses_deterministic_fallback(self, mock_service):
+        """Test that unconfigured Gemini seamlessly falls back to deterministic engine (200 OK)."""
         mock_service.gemini_configured = False
+        mock_service.process_message = AsyncMock(return_value={
+            "message": "Deterministic mode active: here are recommendations.",
+            "recommendations": []
+        })
         
         response = client.post("/api/scout/chat", json={
             "message": "Test",
             "conversation_history": []
         })
         
-        assert response.status_code == 503
-        assert "not configured" in response.json()["detail"].lower()
+        assert response.status_code == 200
+        assert "deterministic mode" in response.json()["message"].lower()
     
     @patch('routers.scout.scout_service')
     def test_chat_configuration_error_returns_503(self, mock_service):

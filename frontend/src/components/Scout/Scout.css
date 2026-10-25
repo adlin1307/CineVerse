@@ -17,13 +17,14 @@
 
 .scout-drawer {
   width: 100%;
-  max-width: min(600px, 94vw);
+  max-width: min(460px, 94vw);
   height: 100vh;
   background: var(--color-bg-primary);
   border-left: 1px solid rgba(212, 175, 55, 0.2);
   display: flex;
   flex-direction: column;
   animation: slide-in 0.3s ease-out;
+  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.8);
 }
 
 @keyframes slide-in {
@@ -725,3 +726,25 @@
   color: var(--color-accent-gold);
   border-color: var(--color-accent-gold);
 }
+
+/* Mobile & Tablet Responsiveness */
+@media (max-width: 768px) {
+  .scout-drawer {
+    max-width: 100vw;
+    border-left: none;
+    height: 100dvh;
+  }
+
+  .scout-header {
+    padding: var(--spacing-md);
+  }
+
+  .scout-messages {
+    padding: var(--spacing-md);
+  }
+
+  .scout-input-container {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+}
+

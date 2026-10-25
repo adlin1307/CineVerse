@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { isInWatchlist, addToWatchlist, removeFromWatchlist } from '../../services/watchlist'
+import CineImage from '../CineImage/CineImage'
 import './PosterCard.css'
 
 export default function PosterCard({ item, mediaType }) {
@@ -53,23 +54,13 @@ export default function PosterCard({ item, mediaType }) {
   return (
     <Link to={linkPath} className="poster-card">
       <div className="poster-image-container">
-        {posterPath ? (
-          <img
-            src={`https://image.tmdb.org/t/p/w500${posterPath}`}
-            alt={title}
-            className="poster-image"
-            loading="lazy"
-          />
-        ) : (
-          <div className="poster-placeholder">
-            <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="2" y="3" width="20" height="18" rx="2" />
-              <circle cx="8.5" cy="8.5" r="2.5" />
-              <path d="M14.5 21 7 13.5" />
-            </svg>
-            <span>{title}</span>
-          </div>
-        )}
+        <CineImage
+          src={posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null}
+          alt={title}
+          title={title}
+          year={year}
+          variant="poster"
+        />
         
         <button
           className={`watchlist-button ${inWatchlist ? 'active' : ''}`}
