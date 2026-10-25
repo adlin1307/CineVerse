@@ -49,3 +49,6 @@ htmlcov/
 # Logs
 *.log
 logs/
+
+# QA artifacts
+qa_screenshots/

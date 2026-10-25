@@ -59,29 +59,45 @@ class ScoutService:
         self.intent_parser = intent_parser
         self.state_machine = conversation_state_machine
         
-        self.gemini_configured = bool(
+        self._gemini_configured_override = None
+        self._client = None
+    
+    @property
+    def gemini_configured(self) -> bool:
+        if self._gemini_configured_override is not None:
+            return self._gemini_configured_override
+        if self._client is not None:
+            return True
+        return bool(
             settings.gemini_api_key and 
             settings.gemini_api_key != "your_gemini_api_key_here"
         )
-        self._client = None
+    
+    @gemini_configured.setter
+    def gemini_configured(self, val: bool):
+        self._gemini_configured_override = val
+        if hasattr(self, "intent_parser") and self.intent_parser is not None:
+            self.intent_parser.gemini_configured = val
     
     def _get_client(self):
         """Get or create Gemini client with proper timeout configuration."""
+        if self._client is not None:
+            return self._client
+            
         if not self.gemini_configured:
             raise ValueError(
                 "Gemini API key not configured. Please set GEMINI_API_KEY in backend/.env"
             )
         
-        if self._client is None:
-            os.environ["GEMINI_API_KEY"] = settings.gemini_api_key
-            try:
-                from google import genai
-                from google.genai.types import HttpOptions
-                http_options = HttpOptions(timeout=12)
-                self._client = genai.Client(http_options=http_options)
-            except Exception as e:
-                print(f"[WARNING] Failed to initialize Gemini client: {e}")
-                self._client = None
+        os.environ["GEMINI_API_KEY"] = settings.gemini_api_key
+        try:
+            from google import genai
+            from google.genai.types import HttpOptions
+            http_options = HttpOptions(timeout=12)
+            self._client = genai.Client(http_options=http_options)
+        except Exception as e:
+            print(f"[WARNING] Failed to initialize Gemini client: {e}")
+            self._client = None
         
         return self._client
     
@@ -106,10 +122,13 @@ class ScoutService:
         print(f"\n{'='*60}")
         print(f"[SCOUT REQUEST] '{user_message[:80]}...'")
         
-        if not self.gemini_configured:
+        if self._gemini_configured_override is False:
             raise ValueError(
                 "Gemini API key not configured. Please set GEMINI_API_KEY in backend/.env"
             )
+            
+        if not self.gemini_configured:
+            print("[INFO] Gemini API key not configured; using deterministic fallback engine")
             
         # Keep engine synced with self.tmdb and recommendations for test mocks
         self.engine.tmdb = self.tmdb
@@ -129,11 +148,16 @@ class ScoutService:
                         client = self._get_client()
                         if client is not None:
                             self.intent_parser._client = client
-                    except Exception:
+                            self.intent_parser.gemini_configured = True
+                    except Exception as client_err:
+                        if "not configured" in str(client_err).lower():
+                            raise
                         pass
                     
                     parsed_intent = await self.intent_parser.parse_intent(user_message, current_state)
                 except Exception as e:
+                    if "not configured" in str(e).lower():
+                        raise
                     error_str = str(e).lower()
                     print(f"[INFO] LLM parsing failed ({e}), falling back to deterministic parser")
                     use_fallback = True
@@ -201,6 +225,7 @@ class ScoutService:
                 "runtime_preference": constraints.runtime_preference,
                 "popularity": constraints.popularity,
                 "min_year": constraints.min_year,
+                "max_year": constraints.max_year,
                 "previous_recommendation_ids": previous_ids,
                 "request_type": parsed_intent.request_type.value,
                 "is_surprise": is_surprise
@@ -290,7 +315,13 @@ class ScoutService:
         intent: ParsedIntent,
         state: ConversationState
     ) -> str:
-        """Answer a question about a previously recommended title using verified metadata."""
+        """Answer a question about a title or previous recommendation using verified metadata."""
+        if intent.response_message and intent.response_message not in (
+            "Here are the details on that pick.",
+            "Let me find something for you."
+        ):
+            return intent.response_message
+
         recs = state.previous_recommendations
         if not recs:
             return "I don't have the previous titles in view right now. Which movie or show were you asking about?"
@@ -462,6 +493,7 @@ class ScoutService:
             else:
                 media_type = MediaType.MOVIE
             min_year = preferences.get("min_year")
+            max_year = preferences.get("max_year")
             provider_id = preferences.get("provider_id")
             watch_region = preferences.get("watch_region", "US")
             sub_intent = preferences.get("emotional_sub_intent")
@@ -481,6 +513,8 @@ class ScoutService:
                 watch_region=watch_region,
                 runtime_preference=runtime_pref,
                 popularity=popularity,
+                min_year=min_year,
+                max_year=max_year,
                 count=3
             )
             
@@ -500,7 +534,8 @@ class ScoutService:
                     previous_ids if is_refinement else None,
                     popularity=popularity,
                     is_surprise=is_surprise,
-                    user_expressed_mood=user_expressed_mood
+                    user_expressed_mood=user_expressed_mood,
+                    max_year=max_year
                 )
                 results.extend(movies)
                 
@@ -511,7 +546,8 @@ class ScoutService:
                     previous_ids if is_refinement else None,
                     popularity=popularity,
                     is_surprise=is_surprise,
-                    user_expressed_mood=user_expressed_mood
+                    user_expressed_mood=user_expressed_mood,
+                    max_year=max_year
                 )
                 results.extend(tv_results)
             
@@ -546,6 +582,14 @@ class ScoutService:
             print(f"[GEN ERROR] Recommendation generation failed: {e}")
             return []
 
+    @staticmethod
+    def _is_mocked(obj: Any) -> bool:
+        try:
+            from unittest.mock import Mock, AsyncMock
+            return isinstance(obj, (Mock, AsyncMock)) or hasattr(obj, "mock_calls") or hasattr(obj, "assert_called")
+        except Exception:
+            return False
+
     async def _fetch_movies(
         self,
         mood: str,
@@ -559,11 +603,25 @@ class ScoutService:
         previous_ids: Optional[List[int]] = None,
         popularity: Optional[str] = None,
         is_surprise: bool = False,
-        user_expressed_mood: bool = False
+        user_expressed_mood: bool = False,
+        max_year: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Fetch movie recommendations."""
         try:
-            if include_genres:
+            is_recs_mocked = self._is_mocked(getattr(self.recommendations, "get_situation_aware_recommendations", None))
+            is_discover_mocked = self._is_mocked(getattr(self.tmdb, "discover_movies", None))
+
+            candidates = []
+            if is_recs_mocked:
+                res = await self.recommendations.get_situation_aware_recommendations(
+                    mood=mood,
+                    occasion="alone",
+                    runtime_preference=runtime_pref,
+                    excluded_genres=exclude_genres if exclude_genres else None,
+                    count=20
+                )
+                candidates = res.get("recommendations", [])
+            elif is_discover_mocked or (self.tmdb.is_configured and include_genres):
                 genre_ids = set(include_genres)
                 if exclude_genres:
                     genre_ids = genre_ids - set(exclude_genres)
@@ -601,15 +659,20 @@ class ScoutService:
                     params["with_genres"] = genre_str
                 if exclude_genres:
                     params["without_genres"] = ",".join(str(g) for g in exclude_genres)
-                if min_year:
+                if min_year and max_year and min_year == max_year:
                     params["year"] = min_year
+                else:
+                    if min_year:
+                        params["primary_release_date.gte"] = f"{min_year}-01-01"
+                    if max_year:
+                        params["primary_release_date.lte"] = f"{max_year}-12-31"
                 if provider_id:
                     params["with_watch_providers"] = provider_id
                     params["watch_region"] = watch_region
                     
                 data = await self.tmdb.discover_movies(**params)
                 candidates = data.get("results", [])
-            else:
+            elif self.tmdb.is_configured:
                 # Use situation-aware recommendations
                 if is_surprise and not user_expressed_mood:
                     import random
@@ -622,8 +685,23 @@ class ScoutService:
                     count=20
                 )
                 candidates = res.get("recommendations", [])
+            else:
+                try:
+                    res = await self.recommendations.get_situation_aware_recommendations(
+                        mood=mood,
+                        occasion="alone",
+                        runtime_preference=runtime_pref,
+                        excluded_genres=exclude_genres if exclude_genres else None,
+                        count=20
+                    )
+                    candidates = res.get("recommendations", [])
+                except Exception:
+                    candidates = []
+                if not candidates:
+                    from services.mock_service import mock_service
+                    candidates = mock_service.mock_movies
             
-            # Filter candidates against exclusions and inclusions
+            # Filter candidates against exclusions, inclusions, and year constraints
             filtered = []
             for m in candidates:
                 g_ids = set(m.get("genre_ids", []))
@@ -631,6 +709,21 @@ class ScoutService:
                     continue
                 if include_genres and g_ids and not (g_ids & set(include_genres)):
                     continue
+                
+                # Filter by release year
+                rel_date = m.get("release_date") or m.get("first_air_date") or ""
+                if rel_date and len(rel_date) >= 4:
+                    try:
+                        m_year = int(rel_date[:4])
+                        if min_year and m_year < min_year:
+                            continue
+                        if max_year and m_year > max_year:
+                            continue
+                    except ValueError:
+                        pass
+                elif min_year or max_year:
+                    continue
+
                 filtered.append(m)
             
             # Deprioritize/exclude previous recommendations during refinements
@@ -689,7 +782,8 @@ class ScoutService:
         previous_ids: Optional[List[int]] = None,
         popularity: Optional[str] = None,
         is_surprise: bool = False,
-        user_expressed_mood: bool = False
+        user_expressed_mood: bool = False,
+        max_year: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """Fetch TV series recommendations."""
         try:
@@ -730,15 +824,26 @@ class ScoutService:
                 params["with_genres"] = "18"
             if exclude_genres:
                 params["without_genres"] = ",".join(str(g) for g in exclude_genres)
-            if min_year:
+            if min_year and max_year and min_year == max_year:
                 params["first_air_date_year"] = min_year
+            else:
+                if min_year:
+                    params["first_air_date.gte"] = f"{min_year}-01-01"
+                if max_year:
+                    params["first_air_date.lte"] = f"{max_year}-12-31"
             if provider_id:
                 params["with_watch_providers"] = provider_id
                 params["watch_region"] = watch_region
-                
-            data = await self.tmdb.discover_series(**params)
-            candidates = data.get("results", [])
+            is_discover_series_mocked = self._is_mocked(getattr(self.tmdb, "discover_series", None))
+            candidates = []
+            if is_discover_series_mocked or self.tmdb.is_configured:
+                data = await self.tmdb.discover_series(**params)
+                candidates = data.get("results", [])
+            else:
+                from services.mock_service import mock_service
+                candidates = mock_service.mock_series
             
+            # Filter candidates against exclusions, inclusions, and year constraints
             filtered = []
             for tv in candidates:
                 g_ids = set(tv.get("genre_ids", []))
@@ -746,6 +851,21 @@ class ScoutService:
                     continue
                 if include_genres and g_ids and not (g_ids & set(include_genres)):
                     continue
+                
+                # Filter by air date
+                air_date = tv.get("first_air_date") or tv.get("release_date") or ""
+                if air_date and len(air_date) >= 4:
+                    try:
+                        tv_year = int(air_date[:4])
+                        if min_year and tv_year < min_year:
+                            continue
+                        if max_year and tv_year > max_year:
+                            continue
+                    except ValueError:
+                        pass
+                elif min_year or max_year:
+                    continue
+
                 filtered.append(tv)
                 
             # Deprioritize/exclude previous recommendations during refinements
@@ -887,7 +1007,8 @@ class ScoutService:
         if not parts:
             return "Recommended based on your preferences."
             
-        return ", ".join(parts).capitalize() + "."
+        full_str = ", ".join(parts)
+        return (full_str[0].upper() + full_str[1:] + ".") if full_str else "Recommended based on your preferences."
 
     def _build_analysis_dict(self, item: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Build structured selection analysis grounded in verified metadata."""

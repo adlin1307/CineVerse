@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { getMovieDetails, getSeriesDetails, getMovieVideos, getSeriesVideos } from '../../services/api'
 import { isInWatchlist, addToWatchlist, removeFromWatchlist } from '../../services/watchlist'
 import PosterRow from '../../components/PosterRow/PosterRow'
@@ -233,14 +233,10 @@ export default function DetailPage({ mediaType }) {
                 <h2>Cast</h2>
                 <div className="cast-grid">
                   {cast.map(person => (
-                    <a 
+                    <Link 
                       key={person.id} 
-                      href={`/person/${person.id}`}
+                      to={`/person/${person.id}`}
                       className="cast-card"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        window.location.href = `/person/${person.id}`
-                      }}
                     >
                       <div className="cast-photo">
                         {person.profile_path ? (
@@ -261,7 +257,7 @@ export default function DetailPage({ mediaType }) {
                       {person.character && (
                         <div className="cast-character">{person.character}</div>
                       )}
-                    </a>
+                    </Link>
                   ))}
                 </div>
               </div>

@@ -118,15 +118,13 @@ async def get_situation_aware_recommendations(
         raise HTTPException(status_code=400, detail=str(e))
     
     except Exception as e:
-        # Log the full error for debugging
         import traceback
-        error_detail = f"{type(e).__name__}: {str(e)}"
-        print(f"[ERROR] Recommendation request failed: {error_detail}")
+        print(f"[ERROR] Recommendation request failed: {type(e).__name__}: {str(e)}")
         traceback.print_exc()
         
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to generate recommendations: {error_detail}"
+            detail="Failed to generate recommendations. Please try again later."
         )
 
 

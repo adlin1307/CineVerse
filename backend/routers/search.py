@@ -21,13 +21,14 @@ async def search_multi(
         data = await service.search_multi(query=query, page=page)
         return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[ERROR] Multi-search failed: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Search failed. Please try again later.")
 
 
 @router.get("/trending")
 async def get_trending(
-    media_type: str = Query("all", regex="^(all|movie|tv)$"),
-    time_window: str = Query("week", regex="^(day|week)$")
+    media_type: str = Query("all", pattern="^(all|movie|tv)$"),
+    time_window: str = Query("week", pattern="^(day|week)$")
 ):
     """Get trending content."""
     try:
@@ -35,4 +36,5 @@ async def get_trending(
         data = await service.get_trending(media_type=media_type, time_window=time_window)
         return data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[ERROR] Trending fetch failed: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve trending content. Please try again later.")

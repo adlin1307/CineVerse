@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { CHATBOT_NAME, CHATBOT_ICON_SVG, CHATBOT_GREETING, CONVERSATION_STARTERS } from './scoutConfig.jsx'
+import { CHATBOT_NAME, CHATBOT_ICON_SVG, CHATBOT_GREETING, CONVERSATION_STARTERS, QUICK_REFINEMENTS } from './scoutConfig.jsx'
 import PosterCard from '../PosterCard/PosterCard'
 import './Scout.css'
 
@@ -16,10 +16,12 @@ export default function Scout({ isOpen, onClose }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [expandedAnalysis, setExpandedAnalysis] = useState({})
+  const [serviceHealth, setServiceHealth] = useState({ configured: true, model: 'gemini-2.5-flash', tmdb: true })
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const requestIdRef = useRef(0)
   const abortControllerRef = useRef(null)
+  const lastUserQueryRef = useRef('')
 
   const toggleAnalysis = (itemKey) => {
     setExpandedAnalysis(prev => ({
@@ -27,6 +29,28 @@ export default function Scout({ isOpen, onClose }) {
       [itemKey]: !prev[itemKey]
     }))
   }
+
+  // Fetch Scout engine health status when opened
+  useEffect(() => {
+    if (isOpen) {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+      fetch(`${apiBase}/api/scout/health`)
+        .then(res => (res.ok ? res.json() : null))
+        .then(data => {
+          if (data) {
+            setServiceHealth({
+              configured: !!data.configured,
+              model: data.model || 'gemini-2.5-flash',
+              tmdb: !!data.tmdb_configured
+            })
+          }
+        })
+        .catch(() => {
+          // Default to deterministic fallback state
+          setServiceHealth({ configured: false, model: '', tmdb: true })
+        })
+    }
+  }, [isOpen])
   
   // Ensure we always have at least the greeting when opened
   useEffect(() => {
@@ -50,6 +74,8 @@ export default function Scout({ isOpen, onClose }) {
   const handleSend = async (messageText = inputValue.trim()) => {
     if (!messageText || isLoading) return
     
+    lastUserQueryRef.current = messageText
+
     // Abort any existing in-flight request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -142,12 +168,13 @@ export default function Scout({ isOpen, onClose }) {
       
       setError(errorMessage)
       
-      // Add error message to chat
+      // Add error message to chat with retry support
       setMessages(prev => [...prev, {
         id: `error-msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         type: 'bot',
         content: errorMessage,
         isError: true,
+        failedQuery: messageText,
         timestamp: new Date()
       }])
     } finally {
@@ -155,6 +182,13 @@ export default function Scout({ isOpen, onClose }) {
         setIsLoading(false)
         abortControllerRef.current = null
       }
+    }
+  }
+
+  const handleRetry = (queryToRetry) => {
+    const query = queryToRetry || lastUserQueryRef.current
+    if (query) {
+      handleSend(query)
     }
   }
   
@@ -204,7 +238,16 @@ export default function Scout({ isOpen, onClose }) {
           <div className="scout-identity">
             <div className="scout-icon"><CHATBOT_ICON_SVG /></div>
             <div>
-              <h2 className="scout-title">{CHATBOT_NAME}</h2>
+              <div className="scout-title-row">
+                <h2 className="scout-title">{CHATBOT_NAME}</h2>
+                <span 
+                  className={`scout-status-pill ${serviceHealth.configured ? 'ai' : 'fallback'}`}
+                  title={serviceHealth.configured ? `AI Active (${serviceHealth.model})` : 'Offline / Deterministic Fallback Mode'}
+                >
+                  <span className="status-dot"></span>
+                  {serviceHealth.configured ? 'AI Active' : 'Deterministic Mode'}
+                </span>
+              </div>
               <p className="scout-subtitle">Your movie & series discovery assistant</p>
             </div>
           </div>
@@ -243,6 +286,21 @@ export default function Scout({ isOpen, onClose }) {
               <div className="message-content">
                 <div className={`message-bubble ${message.isError ? 'error' : ''}`}>
                   {message.content}
+                  {message.isError && (
+                    <div className="message-retry-container">
+                      <button
+                        type="button"
+                        className="scout-retry-btn"
+                        onClick={() => handleRetry(message.failedQuery)}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M1 4v6h6M23 20v-6h-6" />
+                          <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" />
+                        </svg>
+                        <span>Retry</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Recommendations */}
@@ -349,9 +407,9 @@ export default function Scout({ isOpen, onClose }) {
             </div>
           ))}
           
-          {/* Loading indicator */}
+          {/* Loading indicator with skeleton cards */}
           {isLoading && (
-            <div className="scout-message bot">
+            <div className="scout-message bot loading-block">
               <div className="message-avatar"><CHATBOT_ICON_SVG /></div>
               <div className="message-content">
                 <div className="message-bubble loading">
@@ -359,6 +417,19 @@ export default function Scout({ isOpen, onClose }) {
                     <span className="typing-dot"></span>
                     <span className="typing-dot"></span>
                     <span className="typing-dot"></span>
+                  </div>
+                  <span className="typing-label">Scouting TMDB catalog...</span>
+                </div>
+                <div className="scout-skeleton-grid">
+                  <div className="scout-skeleton-card">
+                    <div className="skeleton-poster shimmer"></div>
+                    <div className="skeleton-line shimmer"></div>
+                    <div className="skeleton-line shimmer short"></div>
+                  </div>
+                  <div className="scout-skeleton-card">
+                    <div className="skeleton-poster shimmer"></div>
+                    <div className="skeleton-line shimmer"></div>
+                    <div className="skeleton-line shimmer short"></div>
                   </div>
                 </div>
               </div>
@@ -384,6 +455,22 @@ export default function Scout({ isOpen, onClose }) {
           <div ref={messagesEndRef} />
         </div>
         
+        {/* Quick refinement pills (show when conversation has begun) */}
+        {messages.length > 1 && !isLoading && (
+          <div className="scout-quick-refinements">
+            {QUICK_REFINEMENTS.map((refinement, index) => (
+              <button
+                key={index}
+                type="button"
+                className="refinement-pill"
+                onClick={() => handleSend(refinement)}
+              >
+                {refinement}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Input */}
         <div className="scout-input-container">
           <div className="scout-input-wrapper">

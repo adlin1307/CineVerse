@@ -1,16 +1,34 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { isInWatchlist, addToWatchlist, removeFromWatchlist } from '../../services/watchlist'
 import './PosterCard.css'
 
 export default function PosterCard({ item, mediaType }) {
-  const type = mediaType || item.media_type || 'movie'
+  const resolveMediaType = () => {
+    if (mediaType && mediaType !== 'mixed') return mediaType
+    if (item.media_type) return item.media_type
+    if (item.first_air_date || item.name) return 'tv'
+    return 'movie'
+  }
+  const type = resolveMediaType()
   const title = item.title || item.name
   const releaseDate = item.release_date || item.first_air_date
   const posterPath = item.poster_path
   const year = releaseDate ? new Date(releaseDate).getFullYear() : null
   const rating = item.vote_average ? item.vote_average.toFixed(1) : null
   
-  const inWatchlist = isInWatchlist(item.id, type)
+  const [inWatchlist, setInWatchlist] = useState(() => isInWatchlist(item.id, type))
+
+  useEffect(() => {
+    setInWatchlist(isInWatchlist(item.id, type))
+    
+    const handleUpdate = () => {
+      setInWatchlist(isInWatchlist(item.id, type))
+    }
+    
+    window.addEventListener('watchlistUpdated', handleUpdate)
+    return () => window.removeEventListener('watchlistUpdated', handleUpdate)
+  }, [item.id, type])
   
   const handleWatchlistToggle = (e) => {
     e.preventDefault()
@@ -18,14 +36,15 @@ export default function PosterCard({ item, mediaType }) {
     
     if (inWatchlist) {
       removeFromWatchlist(item.id, type)
+      setInWatchlist(false)
     } else {
       addToWatchlist({
         ...item,
         media_type: type,
       })
+      setInWatchlist(true)
     }
     
-    // Force re-render
     window.dispatchEvent(new Event('watchlistUpdated'))
   }
   

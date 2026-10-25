@@ -57,3 +57,13 @@ export const CONVERSATION_STARTERS = [
   "I want something emotional",
   "Surprise me!"
 ];
+
+export const QUICK_REFINEMENTS = [
+  "Something shorter (< 2h)",
+  "No horror",
+  "Try again",
+  "Surprise me",
+  "Something lighter",
+  "Top rated only"
+];
+

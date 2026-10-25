@@ -1,0 +1,86 @@
+[
+  {
+    "category": "TMDB Credentials",
+    "name": "API Key Presence",
+    "classification": "Blocked by missing credentials or network access",
+    "details": "TMDB_API_KEY is missing or set to placeholder. Requires TMDB_API_KEY in backend/.env",
+    "evidence": null
+  },
+  {
+    "category": "TMDB Mock Mode",
+    "name": "Popular Movies Mock Retrieval",
+    "classification": "Verified using a mock",
+    "details": "Mock service provided 8 movies with all standard schema fields (id, title, overview, release_date, vote_average). Sample: 'The Crimson Dawn'",
+    "evidence": null
+  },
+  {
+    "category": "TMDB Mock Mode",
+    "name": "Movie Detail Mock Retrieval",
+    "classification": "Verified using a mock",
+    "details": "Mock detail for ID 1 loaded 'The Crimson Dawn' with 2 cast and 3 genres.",
+    "evidence": null
+  },
+  {
+    "category": "TMDB Mock Mode",
+    "name": "Person Detail Mock Retrieval",
+    "classification": "Verified using a mock",
+    "details": "Mock person details loaded 'Sarah Chen' with biography and 4 movie credits.",
+    "evidence": null
+  },
+  {
+    "category": "TMDB Service",
+    "name": "Unconfigured Protection",
+    "classification": "Verified using a mock",
+    "details": "Service safely guards calls when unconfigured: 'TMDB API key not configured. Please set TMDB_API_KEY in .env file.'",
+    "evidence": null
+  },
+  {
+    "category": "Gemini Credentials",
+    "name": "API Key Presence",
+    "classification": "Blocked by missing credentials or network access",
+    "details": "Configured model: 'gemini-2.5-flash'. GEMINI_API_KEY is missing or set to placeholder in backend/.env",
+    "evidence": null
+  },
+  {
+    "category": "Gemini Fallback Mode",
+    "name": "Deterministic Rule-Based Intent Extraction",
+    "classification": "Verified using a mock",
+    "details": "Parsed without LLM: language='ta', include=[53], exclude=[27], request_type=fresh_search",
+    "evidence": null
+  },
+  {
+    "category": "Gemini Resilience",
+    "name": "Malformed Response Fallback Recovery",
+    "classification": "Verified using a mock",
+    "details": "Fallback cleanly parsed: include=[35] (Comedy 35), exclude=[10749] (Romance 10749)",
+    "evidence": null
+  },
+  {
+    "category": "Scout Orchestrator",
+    "name": "Full Pipeline in Offline Fallback Mode",
+    "classification": "Verified using a mock",
+    "details": "Returned message: 'Here are some standout Comedy picks that should hit the sweet spot!', Recommendations count: 1",
+    "evidence": null
+  },
+  {
+    "category": "Scout Grounding",
+    "name": "Zero Hallucination / Honest Fallback",
+    "classification": "Verified using a mock",
+    "details": "Recommendations returned: 0. Scout honest response: 'I couldn't find any titles on Netflix that match those exact filters in your region. Want to adjust the genre or check other services?'",
+    "evidence": null
+  },
+  {
+    "category": "Frontend Security",
+    "name": "Client Bundle Key Isolation",
+    "classification": "Verified live",
+    "details": "Frontend environment only contains VITE_API_BASE_URL. No server API keys present in frontend.",
+    "evidence": null
+  },
+  {
+    "category": "API Security",
+    "name": "Response Header Sanitization",
+    "classification": "Verified live",
+    "details": "CORS headers restrict methods and allowed origins. Exception handlers return sanitized user-friendly strings.",
+    "evidence": null
+  }
+]

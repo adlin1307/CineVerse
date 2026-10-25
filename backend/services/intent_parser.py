@@ -49,14 +49,29 @@ class IntentParser:
     """
     
     def __init__(self):
-        self.gemini_configured = bool(
+        self._gemini_configured_override = None
+        self._client = None
+    
+    @property
+    def gemini_configured(self) -> bool:
+        if self._gemini_configured_override is not None:
+            return self._gemini_configured_override
+        if self._client is not None:
+            return True
+        return bool(
             settings.gemini_api_key and 
             settings.gemini_api_key != "your_gemini_api_key_here"
         )
-        self._client = None
+    
+    @gemini_configured.setter
+    def gemini_configured(self, val: bool):
+        self._gemini_configured_override = val
     
     def _get_client(self):
         """Get or create Gemini client."""
+        if self._client is not None:
+            return self._client
+            
         if not self.gemini_configured:
             return None
         
@@ -347,22 +362,44 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
         if chat_intent:
             return chat_intent
         
-        # 2. Check for title questions / references to previous recommendations
+        # 2. Check for creator / director queries (e.g. 'who directed Oppenheimer')
+        creator_intent = self._check_creator_query(message_lower, user_message)
+        if creator_intent:
+            return creator_intent
+        
+        # 3. Check for title questions / references to previous recommendations
         title_q_intent = self._check_title_question(message_lower, user_message, conversation_state)
         if title_q_intent:
             return title_q_intent
         
-        # 3. Detect media type
+        # 4. Extract language and region
+        language, lang_region = self._extract_language(message_lower)
+        
+        # 5. Detect media type
         media_type = self._extract_media_type(message_lower, conversation_state)
+        if not media_type and any(k in message_lower for k in ['kdrama', 'k-drama', 'korean drama']):
+            media_type = MediaType.TV
         
-        # 4. Detect provider & region
+        # 6. Detect provider & region
         provider_id, provider_name, watch_region = self._extract_provider(message_lower)
+        if lang_region and not provider_id:
+            watch_region = lang_region
         
-        # 5. Detect genre inclusions & exclusions
+        # 7. Detect genre inclusions & exclusions
         include_genres, exclude_genres = self._extract_genres(message_lower, media_type)
         
-        # 6. Detect emotional sub-intent & mood
+        # 8. Detect emotional sub-intent & mood
         mood, emotional_sub_intent = self._extract_emotional_intent(message_lower, conversation_state)
+        
+        # 9. Detect similar title references (e.g. 'something like Interstellar')
+        similar_title = self._extract_similar_title(message_lower)
+        if similar_title:
+            sim_genres, sim_mood = self._map_similar_title_to_genres(similar_title)
+            for g in sim_genres:
+                if g not in include_genres and g not in exclude_genres:
+                    include_genres.append(g)
+            if sim_mood and not mood:
+                mood = sim_mood
         
         # If emotional sub-intent is present and Drama (18) is not in genres/exclusions:
         if mood == "emotional" or emotional_sub_intent:
@@ -371,18 +408,19 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             if emotional_sub_intent == "feelgood" and 10751 not in exclude_genres and 10751 not in include_genres:
                 include_genres.append(10751)
         
-        # 7. Detect tone modifiers (e.g., darker, lighter)
+        # 10. Detect tone modifiers (e.g., darker, lighter)
         tone_modifiers = self._extract_tone_modifiers(message_lower)
         if tone_modifiers:
             include_genres, tone_mood = self._apply_tone_genre_mapping(tone_modifiers, include_genres)
             if tone_mood and not mood:
                 mood = tone_mood
         
-        # 8. Detect runtime & popularity
+        # 11. Detect runtime, popularity & release years
         runtime_pref = self._extract_runtime(message_lower)
         popularity = self._extract_popularity(message_lower)
+        min_year, max_year = self._extract_year_range(message_lower)
         
-        # 9. Detect request type
+        # 12. Detect request type
         request_type = self._detect_request_type(
             message_lower,
             has_context,
@@ -393,7 +431,7 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             emotional_sub_intent=emotional_sub_intent
         )
         
-        # 10. Generate conversational response message
+        # 13. Generate conversational response message
         response_msg = self._generate_response_message(
             request_type=request_type,
             media_type=media_type,
@@ -418,8 +456,12 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             provider_id=provider_id,
             provider_name=provider_name,
             watch_region=watch_region,
+            min_year=min_year,
+            max_year=max_year,
             runtime_preference=runtime_pref,
+            language=language,
             popularity=popularity,
+            referenced_title_name=similar_title,
             response_message=response_msg,
             raw_user_message=user_message,
             parser_used="fallback"
@@ -429,6 +471,19 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
         """
         Check if message is a pure greeting, casual banter, or reaction with NO recommendation request.
         """
+        # Check gratitude first so "thanks for the recommendations" is treated as CHAT
+        gratitude_patterns = [
+            r'^\s*(thanks+|thank you+|thx|cheers|appreciate it)\b'
+        ]
+        if any(re.search(p, message_lower) for p in gratitude_patterns):
+            return ParsedIntent(
+                request_type=RequestType.CHAT,
+                confidence=IntentConfidence.HIGH,
+                response_message="You're very welcome! Whenever you need another cinema tip, I'm right here.",
+                raw_user_message=raw_user_message,
+                parser_used="fallback"
+            )
+
         # If there are explicit recommendation actions or genre names, it's NOT pure chat!
         rec_signals = [
             'recommend', 'suggestion', 'suggest', 'find me', 'show me', 'give me',
@@ -795,6 +850,7 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             'action & adventure': (28, 10759),
             'action and adventure': (28, 10759),
             'romantic comedy': (10749, 35),
+            'rom-com': (10749, 35),
             'sci-fi': (878, 10765),
             'scifi': (878, 10765),
             'action': (28, 10759),
@@ -806,18 +862,38 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             'romantic': (10749, 10749),
             'animation': (16, 16),
             'animated': (16, 16),
+            'cartoon': (16, 16),
+            'cartoons': (16, 16),
+            'anime': (16, 16),
             'family': (10751, 10751),
             'documentary': (99, 99),
             'fantasy': (14, 10765),
+            'mystery': (9648, 9648),
+            'crime': (80, 80),
+            'western': (37, 37),
+            'war': (10752, 10768),
+            'musical': (10402, 10402),
+            'music': (10402, 10402),
+            'jump scares': (27, 27),
+            'jump scare': (27, 27),
+            'gore': (27, 27),
         }
         
         negative_patterns = [
-            r'\bno\s+',
+            r'\bno\s+(?:any\s+)?',
             r'\bnothing\s+with\s+',
-            r'\bwithout\s+',
-            r'\bexclude\s+',
-            r'\bskip\s+',
-            r'\bnot\s+',
+            r'\bwithout\s+(?:any\s+)?',
+            r'\bexclude\s+(?:any\s+)?',
+            r'\bskip\s+(?:any\s+)?',
+            r'\bnot\s+(?:any\s+)?',
+            r'\bhate\s+',
+            r'\bavoid\s+(?:any\s+)?',
+            r'\bleave\s+out\s+(?:any\s+)?',
+            r'\bno\s+more\s+',
+            r'\bdon\'?t\s+want\s+(?:any\s+)?',
+            r'\bdo\s+not\s+want\s+(?:any\s+)?',
+            r'\bzero\s+',
+            r'\bnever\s+',
             r'\bno\b(?:\s+\w+){0,3}\s+with\s+'
         ]
         
@@ -973,12 +1049,263 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
         return modifiers
     
     def _extract_runtime(self, message_lower: str) -> Optional[str]:
-        """Extract runtime preference."""
-        if any(w in message_lower for w in ['short', 'shorter', 'quick', 'under 90', 'less than 90']):
+        """Extract runtime preference with natural time phrase normalization."""
+        under_90_patterns = [
+            'short', 'shorter', 'quick', 'brief', 'bite-sized', 'under 90', 'less than 90',
+            'under 90 minutes', 'under 90 mins', 'less than 90m', 'under an hour and a half',
+            'under 1.5 hours', 'under 1.5h'
+        ]
+        standard_patterns = [
+            'standard', '90 to 120', '90 to 130', 'medium length', 'under two hours',
+            'under 2 hours', 'less than two hours', 'less than 2 hours', 'around 2 hours',
+            'under 120 minutes', 'under 120 mins', 'under 2h', 'less than 2h'
+        ]
+        flexible_patterns = [
+            'long', 'longer', 'epic', 'over 2 hours', 'over two hours', 'over 2.5 hours',
+            'over 150 minutes'
+        ]
+        if any(p in message_lower for p in under_90_patterns):
             return 'under_90'
-        elif any(w in message_lower for w in ['standard', '90 to 120', '90 to 130', 'medium length']):
+        if any(p in message_lower for p in standard_patterns):
             return '90_to_130'
+        if any(p in message_lower for p in flexible_patterns):
+            return 'flexible'
         return None
+
+    def _extract_language(self, message_lower: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Extract language and associated watch region.
+        Supports regional Indian cinema (Tamil, Telugu, Malayalam, Hindi) and international languages.
+        """
+        lang_map = {
+            'tamil': ('ta', 'IN'),
+            'kollywood': ('ta', 'IN'),
+            'telugu': ('te', 'IN'),
+            'tollywood': ('te', 'IN'),
+            'malayalam': ('ml', 'IN'),
+            'mollywood': ('ml', 'IN'),
+            'hindi': ('hi', 'IN'),
+            'bollywood': ('hi', 'IN'),
+            'korean': ('ko', 'KR'),
+            'kdrama': ('ko', 'KR'),
+            'k-drama': ('ko', 'KR'),
+            'japanese': ('ja', 'JP'),
+            'anime': ('ja', 'JP'),
+            'french': ('fr', 'FR'),
+            'spanish': ('es', 'ES'),
+            'german': ('de', 'DE'),
+            'italian': ('it', 'IT'),
+        }
+        for word, (code, region) in lang_map.items():
+            if re.search(rf'\b{word}\b', message_lower):
+                return code, region
+        return None, None
+
+    def _extract_year_range(self, message_lower: str) -> Tuple[Optional[int], Optional[int]]:
+        """
+        Extract release year constraints (min_year, max_year).
+        Supports:
+        - "after 2020", "post 2020", "since 2020"
+        - "before 2000", "pre 2000", "prior to 2010"
+        - "between 2010 and 2020", "from 2010 to 2020"
+        - "90s", "80s", "70s", "2000s", "2010s", "2020s"
+        - "released in 1910", "from 1910", "made in 1994"
+        """
+        # 1. Between range: "between 2010 and 2020", "from 2010 to 2020"
+        between_match = re.search(
+            r'\b(?:between|from)\s+(19\d\d|20[0-9]\d)\s+(?:and|to)\s+(19\d\d|20[0-9]\d)\b',
+            message_lower
+        )
+        if between_match:
+            y1, y2 = int(between_match.group(1)), int(between_match.group(2))
+            return (min(y1, y2), max(y1, y2))
+        
+        # 2. Decades
+        decade_map = {
+            r'\b(?:the\s+)?(?:\'|19)?70s\b': (1970, 1979),
+            r'\b(?:the\s+)?(?:\'|19)?80s\b': (1980, 1989),
+            r'\b(?:the\s+)?(?:\'|19)?90s\b': (1990, 1999),
+            r'\b(?:the\s+)?(?:20)?00s\b': (2000, 2009),
+            r'\b(?:the\s+)?(?:20)?10s\b': (2010, 2019),
+            r'\b(?:the\s+)?(?:20)?20s\b': (2020, 2029),
+        }
+        for pat, (d_min, d_max) in decade_map.items():
+            if re.search(pat, message_lower):
+                return (d_min, d_max)
+
+        # 3. After / Post / Since
+        after_match = re.search(
+            r'\b(?:released\s+)?(?:after|post|since|newer\s+than)\s+(19\d\d|20[0-9]\d)\b',
+            message_lower
+        )
+        if after_match:
+            year = int(after_match.group(1))
+            if "since" in message_lower:
+                return (year, None)
+            return (year + 1, None)
+        
+        # 4. Before / Pre / Prior to
+        before_match = re.search(
+            r'\b(?:released\s+)?(?:before|pre|prior\s+to|older\s+than)\s+(19\d\d|20[0-9]\d)\b',
+            message_lower
+        )
+        if before_match:
+            year = int(before_match.group(1))
+            return (None, year - 1)
+
+        # 5. Exact year: "released in 1910", "made in 1994", "from 1910", "in the year 2021"
+        exact_match = re.search(
+            r'\b(?:released\s+in|made\s+in|from\s+the\s+year|from\s+year|in\s+the\s+year|from)\s+(19\d\d|20[0-9]\d)\b',
+            message_lower
+        )
+        if exact_match:
+            year = int(exact_match.group(1))
+            return (year, year)
+
+        # 6. "in <year>"
+        in_match = re.search(
+            r'\b(?:released\s+)?in\s+(19\d\d|20[0-9]\d)\b',
+            message_lower
+        )
+        if in_match:
+            year = int(in_match.group(1))
+            return (year, year)
+
+        # 7. Standalone year before a media word: "1910 movie", "2023 film", "2022 thriller"
+        standalone_match = re.search(
+            r'\b(19\d\d|20[0-9]\d)\s+(?:movie|movies|film|films|cinema|thriller|comedy|drama|action|horror|show|series)\b',
+            message_lower
+        )
+        if standalone_match:
+            year = int(standalone_match.group(1))
+            return (year, year)
+
+        return (None, None)
+
+    def _check_creator_query(self, message_lower: str, raw_user_message: str) -> Optional[ParsedIntent]:
+        """Check for director/creator/actor specific questions."""
+        who_directed_match = re.search(
+            r'\b(?:who\s+directed|who\s+is\s+the\s+director\s+of|who\s+made|director\s+of)\s+([A-Za-z0-9\s\':\-\.]+)',
+            message_lower
+        )
+        if who_directed_match:
+            title = who_directed_match.group(1).strip()
+            directors = {
+                'oppenheimer': 'Christopher Nolan',
+                'interstellar': 'Christopher Nolan',
+                'inception': 'Christopher Nolan',
+                'tenet': 'Christopher Nolan',
+                'dunkirk': 'Christopher Nolan',
+                'the dark knight': 'Christopher Nolan',
+                'memento': 'Christopher Nolan',
+                'the prestige': 'Christopher Nolan',
+                'dune': 'Denis Villeneuve',
+                'blade runner 2049': 'Denis Villeneuve',
+                'arrival': 'Denis Villeneuve',
+                'sicario': 'Denis Villeneuve',
+                'parasite': 'Bong Joon-ho',
+                'snowpiercer': 'Bong Joon-ho',
+                'pulp fiction': 'Quentin Tarantino',
+                'inglourious basterds': 'Quentin Tarantino',
+                'django unchained': 'Quentin Tarantino',
+                'kill bill': 'Quentin Tarantino',
+                'titanic': 'James Cameron',
+                'avatar': 'James Cameron',
+                'jurassic park': 'Steven Spielberg',
+                'schindler\'s list': 'Steven Spielberg',
+                'jaws': 'Steven Spielberg',
+                'goodfellas': 'Martin Scorsese',
+                'taxi driver': 'Martin Scorsese',
+                'the wolf of wall street': 'Martin Scorsese',
+                'fight club': 'David Fincher',
+                'se7en': 'David Fincher',
+                'the social network': 'David Fincher',
+                'vikram': 'Lokesh Kanagaraj',
+                'kaithi': 'Lokesh Kanagaraj',
+                'leo': 'Lokesh Kanagaraj',
+                'jailer': 'Nelson Dilipkumar',
+                'baahubali': 'S. S. Rajamouli',
+                'rrr': 'S. S. Rajamouli',
+            }
+            clean_title = re.sub(r'[^\w\s]', '', title).strip()
+            ans_director = None
+            for k, d in directors.items():
+                if k in title or k in clean_title:
+                    ans_director = (d, k.title())
+                    break
+            if ans_director:
+                return ParsedIntent(
+                    request_type=RequestType.TITLE_QUESTION,
+                    confidence=IntentConfidence.HIGH,
+                    referenced_title_name=ans_director[1],
+                    response_message=f"{ans_director[0]} directed {ans_director[1]}.",
+                    raw_user_message=raw_user_message,
+                    parser_used="fallback"
+                )
+        return None
+
+    def _extract_similar_title(self, message_lower: str) -> Optional[str]:
+        """Extract title from 'like <title>' or 'similar to <title>'."""
+        patterns = [
+            r'\b(?:something\s+like|movies?\s+like|films?\s+like|shows?\s+like|series\s+like|similar\s+to|more\s+like|along\s+the\s+lines\s+of)\s+([A-Za-z0-9\s\':\-\.]+?)(?:\s+(?:please|tonight|recommend|movies?|films?|shows?|series)|$)',
+            r'\b(?:fans\s+of|if\s+i\s+liked|if\s+i\s+loved)\s+([A-Za-z0-9\s\':\-\.]+?)(?:\s+(?:what|recommend|suggest)|$)'
+        ]
+        for pat in patterns:
+            m = re.search(pat, message_lower)
+            if m:
+                title = m.group(1).strip()
+                if title and title not in ['that', 'this', 'it', 'them', 'those', 'the first', 'the second', 'horror', 'action', 'comedy']:
+                    return title
+        return None
+
+    def _map_similar_title_to_genres(self, title: str) -> Tuple[List[int], Optional[str]]:
+        """Map common reference titles to verified genres and mood."""
+        t = title.lower().strip()
+        catalog = {
+            'interstellar': ([878, 18], 'curious'),
+            'inception': ([878, 28, 53], 'curious'),
+            'the dark knight': ([28, 80, 18], 'excited'),
+            'parasite': ([53, 18, 35], 'curious'),
+            'the notebook': ([10749, 18], 'emotional'),
+            'whiplash': ([18, 10402], 'excited'),
+            'superbad': ([35], 'relaxed'),
+            'the conjuring': ([27, 9648], 'excited'),
+            'hereditary': ([27, 9648], 'excited'),
+            'dune': ([878, 12], 'curious'),
+            'blade runner': ([878, 9648], 'curious'),
+            'knives out': ([9648, 35], 'curious'),
+            'oppenheimer': ([18, 36], 'emotional'),
+            'alien': ([27, 878], 'excited'),
+            'pulp fiction': ([80, 18], 'excited'),
+            'the matrix': ([878, 28], 'excited'),
+            'get out': ([9648, 53, 27], 'curious'),
+            'la la land': ([35, 18, 10402], 'emotional'),
+            'spider-man': ([28, 12, 878], 'excited'),
+            'avengers': ([28, 12, 878], 'excited'),
+            'fight club': ([18, 53], 'curious'),
+            'se7en': ([80, 9648, 53], 'curious'),
+            'shutter island': ([18, 9648, 53], 'curious'),
+            'silence of the lambs': ([80, 18, 53], 'curious'),
+            'zodiac': ([80, 18, 9648], 'curious'),
+            'goodfellas': ([18, 80], 'excited'),
+            'godfather': ([18, 80], 'emotional'),
+            'breaking bad': ([18, 80], 'excited'),
+            'stranger things': ([10765, 18, 9648], 'curious'),
+            'game of thrones': ([10765, 18, 10759], 'excited'),
+            'vikram': ([28, 53], 'excited'),
+            'leo': ([28, 53], 'excited'),
+            'jailer': ([28, 35], 'excited'),
+            'kaithi': ([28, 53], 'excited'),
+            'master': ([28, 53], 'excited'),
+            'asuran': ([28, 18], 'emotional'),
+            'rrr': ([28, 18], 'excited'),
+            'baahubali': ([28, 12, 14], 'excited'),
+            'drishyam': ([80, 53, 18], 'curious')
+        }
+        for key, (genres, mood) in catalog.items():
+            if key in t or t in key:
+                return genres, mood
+        return [], None
     
     def _extract_popularity(self, message_lower: str) -> Optional[str]:
         """Extract popularity preference."""

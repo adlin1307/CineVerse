@@ -1,6 +1,8 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from pydantic import field_validator
+from typing import Optional, List, Union
 from pathlib import Path
+import json
 
 
 # Get the directory where this config file is located
@@ -17,7 +19,7 @@ class Settings(BaseSettings):
     
     # Gemini API
     gemini_api_key: Optional[str] = None
-    gemini_model: str = "gemini-3.5-flash-lite"
+    gemini_model: str = "gemini-2.5-flash"
     
     # Streaming Provider Configuration
     watch_region: str = "IN"  # Default to India (ISO 3166-1 alpha-2)
@@ -30,7 +32,20 @@ class Settings(BaseSettings):
     port: int = 8000
     
     # CORS
-    allowed_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    allowed_origins: Union[List[str], str] = ["http://localhost:5173", "http://localhost:3000"]
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v):
+        if isinstance(v, str):
+            v_clean = v.strip()
+            if v_clean.startswith("[") and v_clean.endswith("]"):
+                try:
+                    return json.loads(v_clean)
+                except Exception:
+                    pass
+            return [origin.strip() for origin in v_clean.split(",") if origin.strip()]
+        return v
     
     model_config = {
         "env_file": str(ENV_FILE),
