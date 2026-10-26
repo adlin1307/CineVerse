@@ -10,17 +10,6 @@ class TMDBService:
         self.base_url = settings.tmdb_base_url
         self.image_base_url = "https://image.tmdb.org/t/p/"
         self._api_key_override = None
-        
-    @property
-    def api_key(self) -> str:
-        if self._api_key_override is not None:
-            return self._api_key_override
-        return settings.tmdb_api_key
-        
-    @property
-    def is_configured(self) -> bool:
-        return bool(self.api_key and self.api_key != "your_api_key_here")
-        
         # Configure timeouts and limits to prevent connection issues
         self.timeout = httpx.Timeout(
             connect=10.0,  # 10 seconds to establish connection
@@ -38,6 +27,22 @@ class TMDBService:
         # Create a persistent client (reused across requests)
         self._client: Optional[httpx.AsyncClient] = None
     
+        
+    @property
+    def api_key(self) -> str:
+        if self._api_key_override is not None:
+            return self._api_key_override
+        return settings.tmdb_api_key
+        
+    @property
+    def is_configured(self) -> bool:
+        if not self.api_key:
+            return False
+        clean = self.api_key.strip().lower()
+        if clean in ["your_api_key_here", "your_tmdb_api_key_here", "your_actual_tmdb_key_here", ""]:
+            return False
+        return True
+        
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the HTTP client."""
         if self._client is None or self._client.is_closed:
