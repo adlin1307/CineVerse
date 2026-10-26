@@ -22,19 +22,29 @@ export default function HomePage() {
       setLoading(true)
       setError(null)
       
-      const [trendingData, moviesData, seriesData] = await Promise.all([
+      const [trendingRes, moviesRes, seriesRes] = await Promise.allSettled([
         getTrending('all', 'week'),
         getPopularMovies(1),
         getPopularSeries(1)
       ])
       
-      setTrending(trendingData.results || [])
-      setPopularMovies(moviesData.results || [])
-      setPopularSeries(seriesData.results || [])
+      const trendingResults = trendingRes.status === 'fulfilled' ? (trendingRes.value?.results || []) : []
+      const moviesResults = moviesRes.status === 'fulfilled' ? (moviesRes.value?.results || []) : []
+      const seriesResults = seriesRes.status === 'fulfilled' ? (seriesRes.value?.results || []) : []
       
-      // Set featured content from trending
-      if (trendingData.results && trendingData.results.length > 0) {
-        setFeatured(trendingData.results[0])
+      if (trendingResults.length === 0 && moviesResults.length === 0 && seriesResults.length === 0) {
+        throw new Error('Failed to load any home content')
+      }
+      
+      setTrending(trendingResults)
+      setPopularMovies(moviesResults)
+      setPopularSeries(seriesResults)
+      
+      // Set featured content from trending or popular movies
+      if (trendingResults.length > 0) {
+        setFeatured(trendingResults[0])
+      } else if (moviesResults.length > 0) {
+        setFeatured(moviesResults[0])
       }
     } catch (err) {
       console.error('Failed to load home data:', err)
@@ -43,6 +53,7 @@ export default function HomePage() {
       setLoading(false)
     }
   }
+
   
   if (loading) {
     return (

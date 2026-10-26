@@ -20,10 +20,12 @@ async def get_popular_movies(page: int = Query(1, ge=1, le=500)):
         data = await service.get_popular_movies(page=page)
         return data
     except Exception as e:
-        import traceback
-        print(f"[ERROR] Popular movies failed: {type(e).__name__}: {str(e)}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Failed to retrieve popular movies. Please try again later.")
+        print(f"[WARN] Popular movies from TMDB failed: {type(e).__name__}: {str(e)}. Falling back to mock data.")
+        try:
+            return await mock_service.get_popular_movies(page=page)
+        except Exception:
+            raise HTTPException(status_code=500, detail="Failed to retrieve popular movies. Please try again later.")
+
 
 
 @router.get("/discover")

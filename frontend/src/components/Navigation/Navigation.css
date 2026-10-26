@@ -155,6 +155,74 @@
   white-space: nowrap;
 }
 
+/* User Profile & Auth Controls */
+.nav-user-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.nav-username {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--color-accent-gold);
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.25);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-user-icon {
+  flex-shrink: 0;
+  color: var(--color-accent-gold);
+}
+
+.nav-auth-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.nav-signin-btn {
+  background: linear-gradient(135deg, var(--color-accent-gold), var(--color-accent-gold-hover));
+  color: #0b0b0d;
+  border: none;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.25);
+}
+
+.nav-signin-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.4);
+  filter: brightness(1.08);
+}
+
+.nav-logout-btn {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.nav-logout-btn:hover {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.4);
+  color: var(--color-accent-gold);
+}
+
 /* Mobile Responsive */
 @media (max-width: 768px) {
   .nav-container {
@@ -198,9 +266,27 @@
   .nav-actions {
     flex-direction: column;
     align-items: stretch;
+    gap: var(--spacing-sm);
+  }
+
+  .nav-user-profile {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-xs);
+  }
+
+  .nav-username {
+    max-width: 100%;
+    justify-content: center;
+  }
+
+  .nav-auth-btn {
+    width: 100%;
+    padding: 10px;
   }
   
   .scout-trigger-text {
     display: inline;
   }
 }
+

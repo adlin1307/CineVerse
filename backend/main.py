@@ -3,13 +3,26 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings, ENV_FILE
-from routers import movies_router, series_router, search_router, people_router, recommendations_router, scout_router
+from routers import (
+    movies_router,
+    series_router,
+    search_router,
+    people_router,
+    recommendations_router,
+    scout_router,
+    auth_router,
+    watchlist_router
+)
+from database import init_db
 import uvicorn
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifecycle management for startup and shutdown."""
+    # Initialize SQLite database schema
+    init_db()
+    
     # Startup logging (without exposing secrets)
     tmdb_configured = bool(settings.tmdb_api_key and settings.tmdb_api_key != "your_api_key_here")
     gemini_configured = bool(settings.gemini_api_key and settings.gemini_api_key != "your_gemini_api_key_here")
@@ -18,6 +31,7 @@ async def lifespan(app: FastAPI):
     print(f"[Config] TMDB API Key configured: {tmdb_configured}")
     print(f"[Config] Gemini API Key configured: {gemini_configured}")
     print(f"[Config] Active Gemini Model: {settings.gemini_model}")
+    print("[Config] Database initialized: SQLite (cineverse.db)")
     yield
     # Cleanup on shutdown
     try:
@@ -55,6 +69,8 @@ app.include_router(search_router)
 app.include_router(people_router)
 app.include_router(recommendations_router)
 app.include_router(scout_router)
+app.include_router(auth_router)
+app.include_router(watchlist_router)
 
 
 @app.get("/")
@@ -78,8 +94,8 @@ async def health_check():
         "status": "healthy",
         "tmdb_configured": tmdb_configured,
         "gemini_configured": gemini_configured,
-        "database": None,
-        "persistence": "client_local_storage"
+        "database": "sqlite",
+        "persistence": "sqlite_db"
     }
 
 

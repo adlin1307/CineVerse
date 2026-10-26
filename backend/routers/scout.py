@@ -4,10 +4,19 @@ Scout conversational movie discovery router.
 Provides the /api/scout/chat endpoint for natural language movie recommendations.
 """
 
-from fastapi import APIRouter, HTTPException
+import uuid
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from services.scout_service import scout_service
+from routers.auth import get_current_user
+from database import (
+    list_conversations,
+    get_conversation,
+    create_conversation as db_create_conversation,
+    delete_conversation as db_delete_conversation,
+    add_message_to_conversation
+)
 
 
 router = APIRouter(prefix="/api/scout", tags=["scout"])
@@ -29,6 +38,10 @@ class ChatRequest(BaseModel):
     conversation_history: List[ConversationMessage] = Field(
         default=[],
         description="Previous conversation messages for context"
+    )
+    conversation_id: Optional[str] = Field(
+        default=None,
+        description="Optional persistent conversation ID"
     )
 
 
@@ -54,65 +67,24 @@ class ChatResponse(BaseModel):
         default=[],
         description="Movie recommendations (if applicable)"
     )
+    conversation_id: Optional[str] = Field(
+        default=None,
+        description="Associated conversation ID"
+    )
+
+
+class CreateConversationRequest(BaseModel):
+    id: Optional[str] = None
+    title: Optional[str] = "New Chat"
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def scout_chat(request: ChatRequest):
+async def scout_chat(request: ChatRequest, user: Optional[Dict[str, Any]] = Depends(get_current_user)):
     """
     Chat with Scout for conversational movie discovery.
     
     Scout uses Gemini API to interpret natural language requests and returns
     recommendations from the actual TMDB catalog using the existing recommendation engine.
-    
-    **Scout's Personality:**
-    - Witty, cheeky, and movie-obsessed
-    - Conversational and helpful without being generic
-    - Remembers context within the conversation
-    
-    **Supported Requests:**
-    - "Find something fun for tonight"
-    - "Recommend an underrated thriller"
-    - "Something emotional but not too long"
-    - "No horror this time" (refines previous preferences)
-    - "Make it shorter" (adjusts runtime)
-    - "Try again" (different recommendations with same criteria)
-    
-    **Context Management:**
-    - Maintains preferences across the conversation (genres, runtime, mood)
-    - Accumulates exclusions ("no horror", "skip comedies")
-    - Asks clarifying questions only when critical info is missing
-    
-    **Example Request:**
-    ```json
-    {
-        "message": "I want something fun for tonight",
-        "conversation_history": []
-    }
-    ```
-    
-    **Example Response:**
-    ```json
-    {
-        "message": "Fun vibes, got it! Pulling some crowd-pleasers.",
-        "recommendations": [
-            {
-                "id": 123,
-                "title": "Movie Title",
-                "poster_path": "/path.jpg",
-                "vote_average": 7.5,
-                "release_date": "2024-01-15",
-                "explanation": "Perfect for a chill watch"
-            }
-        ]
-    }
-    ```
-    
-    **Error Handling:**
-    - 503: Gemini API not configured (GEMINI_API_KEY required in backend/.env)
-    - 429: Rate limit exceeded (try again in a moment)
-    - 500: Processing error (API timeout, invalid response, etc.)
-    
-    **Note:** Requires GEMINI_API_KEY to be configured in backend/.env
     """
     try:
         # Check if Scout service is configured
@@ -124,6 +96,20 @@ async def scout_chat(request: ChatRequest):
                     "Please set GEMINI_API_KEY in the backend/.env file."
                 )
             )
+        
+        user_id = user["id"] if user else None
+        conv_id = request.conversation_id
+        if conv_id:
+            try:
+                add_message_to_conversation(
+                    conv_id=conv_id,
+                    user_id=user_id,
+                    role="user",
+                    content=request.message,
+                    recommendations=None
+                )
+            except Exception as e:
+                print(f"[SCOUT HISTORY] Failed to save user message: {e}")
         
         # Process message with Scout
         result = await scout_service.process_message(
@@ -138,12 +124,26 @@ async def scout_chat(request: ChatRequest):
             ]
         )
         
+        recs = result.get("recommendations", [])
+        if conv_id:
+            try:
+                add_message_to_conversation(
+                    conv_id=conv_id,
+                    user_id=user_id,
+                    role="assistant",
+                    content=result["message"],
+                    recommendations=recs
+                )
+            except Exception as e:
+                print(f"[SCOUT HISTORY] Failed to save assistant message: {e}")
+        
         return ChatResponse(
             message=result["message"],
             recommendations=[
                 MovieRecommendation(**movie)
-                for movie in result.get("recommendations", [])
-            ]
+                for movie in recs
+            ],
+            conversation_id=conv_id
         )
     
     except ValueError as e:
@@ -198,3 +198,38 @@ async def scout_health():
         "model": settings.gemini_model,
         "tmdb_configured": tmdb_service.is_configured
     }
+
+
+@router.get("/conversations")
+async def get_conversations(user: Optional[Dict[str, Any]] = Depends(get_current_user)):
+    """List all saved conversations for current user."""
+    user_id = user["id"] if user else None
+    return list_conversations(user_id)
+
+
+@router.post("/conversations")
+async def create_new_conversation(req: CreateConversationRequest, user: Optional[Dict[str, Any]] = Depends(get_current_user)):
+    """Create a new conversation record."""
+    user_id = user["id"] if user else None
+    conv_id = req.id or str(uuid.uuid4())
+    return db_create_conversation(conv_id, user_id, req.title or "New Chat")
+
+
+@router.get("/conversations/{conv_id}")
+async def get_single_conversation(conv_id: str, user: Optional[Dict[str, Any]] = Depends(get_current_user)):
+    """Retrieve an individual conversation and its messages."""
+    user_id = user["id"] if user else None
+    conv = get_conversation(conv_id, user_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return conv
+
+
+@router.delete("/conversations/{conv_id}")
+async def delete_single_conversation(conv_id: str, user: Optional[Dict[str, Any]] = Depends(get_current_user)):
+    """Delete a single conversation."""
+    user_id = user["id"] if user else None
+    deleted = db_delete_conversation(conv_id, user_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Conversation not found or access denied")
+    return {"success": True, "message": "Conversation deleted"}

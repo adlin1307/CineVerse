@@ -36,5 +36,17 @@ async def get_trending(
         data = await service.get_trending(media_type=media_type, time_window=time_window)
         return data
     except Exception as e:
-        print(f"[ERROR] Trending fetch failed: {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve trending content. Please try again later.")
+        print(f"[WARN] Trending from TMDB failed: {type(e).__name__}: {str(e)}. Falling back to mock data.")
+        try:
+            movies_data = await mock_service.get_popular_movies(1)
+            series_data = await mock_service.get_popular_series(1)
+            results = (movies_data.get("results", [])[:10]) + (series_data.get("results", [])[:10])
+            return {
+                "page": 1,
+                "results": results,
+                "total_pages": 1,
+                "total_results": len(results)
+            }
+        except Exception:
+            raise HTTPException(status_code=500, detail="Failed to retrieve trending content. Please try again later.")
+

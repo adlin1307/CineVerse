@@ -1,19 +1,61 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+export function getAuthToken() {
+  return localStorage.getItem('cineverse_token');
+}
+
+export function setAuthSession(token, user) {
+  if (token) {
+    localStorage.setItem('cineverse_token', token);
+  } else {
+    localStorage.removeItem('cineverse_token');
+  }
+  if (user) {
+    localStorage.setItem('cineverse_user', JSON.stringify(user));
+  } else {
+    localStorage.removeItem('cineverse_user');
+  }
+  window.dispatchEvent(new Event('authChanged'));
+}
+
+export function getStoredUser() {
+  try {
+    const raw = localStorage.getItem('cineverse_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchAPI(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
+  const token = getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
   
   try {
     const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
       ...options,
+      headers,
     });
     
+    if (response.status === 401 && token) {
+      // Session expired or invalid
+      setAuthSession(null, null);
+    }
+    
     if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
+      let errDetail = response.statusText;
+      try {
+        const errorJson = await response.json();
+        if (errorJson.detail) errDetail = errorJson.detail;
+      } catch {}
+      const err = new Error(errDetail);
+      err.status = response.status;
+      throw err;
     }
     
     return await response.json();
@@ -102,3 +144,103 @@ export async function getRecommendationOptions() {
 export async function getRecommendationGenres() {
   return fetchAPI('/api/recommendations/genres');
 }
+
+// Authentication
+export async function signupUser(username, password) {
+  const data = await fetchAPI('/api/auth/signup', {
+    method: 'POST',
+    body: JSON.stringify({ username, password })
+  });
+  if (data.token) {
+    setAuthSession(data.token, data.user);
+  }
+  return data;
+}
+
+export async function loginUser(username, password) {
+  const data = await fetchAPI('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password })
+  });
+  if (data.token) {
+    setAuthSession(data.token, data.user);
+  }
+  return data;
+}
+
+export async function logoutUser() {
+  try {
+    await fetchAPI('/api/auth/logout', { method: 'POST' });
+  } catch {}
+  setAuthSession(null, null);
+}
+
+export async function checkAuthMe() {
+  return fetchAPI('/api/auth/me');
+}
+
+// Watchlist API
+export async function fetchWatchlistAPI() {
+  return fetchAPI('/api/watchlist');
+}
+
+export async function addWatchlistAPI(item) {
+  return fetchAPI('/api/watchlist', {
+    method: 'POST',
+    body: JSON.stringify({ item })
+  });
+}
+
+export async function removeWatchlistAPI(mediaType, itemId) {
+  return fetchAPI(`/api/watchlist/${mediaType}/${itemId}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function clearWatchlistAPI() {
+  return fetchAPI('/api/watchlist', {
+    method: 'DELETE'
+  });
+}
+
+export async function syncWatchlistAPI(items) {
+  return fetchAPI('/api/watchlist/sync', {
+    method: 'POST',
+    body: JSON.stringify({ items })
+  });
+}
+
+// Scout Conversations API
+export async function fetchConversationsAPI() {
+  return fetchAPI('/api/scout/conversations');
+}
+
+export async function fetchConversationAPI(convId) {
+  return fetchAPI(`/api/scout/conversations/${convId}`);
+}
+
+export async function createConversationAPI(id, title) {
+  return fetchAPI('/api/scout/conversations', {
+    method: 'POST',
+    body: JSON.stringify({ id, title })
+  });
+}
+
+export async function deleteConversationAPI(convId) {
+  return fetchAPI(`/api/scout/conversations/${convId}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function sendScoutChatAPI(message, conversationHistory = [], conversationId = null, options = {}) {
+  return fetchAPI('/api/scout/chat', {
+    method: 'POST',
+    body: JSON.stringify({
+      message,
+      conversation_history: conversationHistory,
+      conversation_id: conversationId
+    }),
+    ...options
+  });
+}
+

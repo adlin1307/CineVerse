@@ -91,9 +91,291 @@
   color: var(--color-accent-gold);
 }
 
+.scout-btn.active {
+  background: rgba(212, 175, 55, 0.18);
+  color: var(--color-accent-gold);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+}
+
 .scout-btn:focus-visible {
   outline: 2px solid var(--color-accent-gold);
   outline-offset: 2px;
+}
+
+/* Body Wrapper & History Drawer */
+.scout-body-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+.scout-main-chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
+}
+
+.scout-history-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #111113;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  animation: fade-in 0.2s ease-out;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+}
+
+.history-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+  background: rgba(20, 20, 22, 0.95);
+}
+
+.history-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-accent-gold);
+}
+
+.history-new-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.1));
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  color: var(--color-accent-gold);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.history-new-btn:hover {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.35), rgba(212, 175, 55, 0.2));
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.2);
+}
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.history-item:hover {
+  background: rgba(212, 175, 55, 0.08);
+  border-color: rgba(212, 175, 55, 0.25);
+}
+
+.history-item.active {
+  background: rgba(212, 175, 55, 0.14);
+  border-color: var(--color-accent-gold);
+  box-shadow: inset 3px 0 0 var(--color-accent-gold);
+}
+
+.history-item-icon {
+  color: var(--color-accent-gold);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.history-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.history-item-title {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-item-date {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.history-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  opacity: 0.6;
+}
+
+.history-item:hover .history-delete-btn,
+.history-delete-btn:focus {
+  opacity: 1;
+}
+
+.history-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+}
+
+.history-empty {
+  padding: var(--spacing-2xl) var(--spacing-lg);
+  text-align: center;
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.history-empty p {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  margin: 0;
+}
+
+.history-empty span {
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* Delete Confirmation Modal */
+.history-confirm-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-md);
+  animation: fade-in 0.15s ease-out;
+}
+
+.history-confirm-modal {
+  background: #141416;
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  max-width: 320px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  animation: scale-up 0.2s ease-out;
+}
+
+@keyframes scale-up {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.history-confirm-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  margin-bottom: 12px;
+}
+
+.history-confirm-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 8px 0;
+}
+
+.history-confirm-text {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 18px 0;
+  line-height: 1.45;
+}
+
+.history-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.history-btn-cancel {
+  flex: 1;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.history-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.history-btn-danger {
+  flex: 1;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  background: #dc2626;
+  border: none;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.history-btn-danger:hover {
+  background: #b91c1c;
 }
 
 /* Messages */

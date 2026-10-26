@@ -210,6 +210,10 @@ class ScoutService:
                 if isinstance(r, dict) and r.get("id") is not None
             ]
             
+            # Determine requested count (explicit from intent or user message, or from state, or default 3)
+            explicit_count = parsed_intent.requested_count or self.intent_parser._extract_requested_count(user_message.lower())
+            count = explicit_count or constraints.requested_count or 3
+            
             # Convert state constraints to preferences dict
             media_type = constraints.media_type or MediaType.BOTH
             is_surprise = any(w in user_message.lower() for w in ["surprise me", "surprise", "something random"])
@@ -228,21 +232,25 @@ class ScoutService:
                 "max_year": constraints.max_year,
                 "previous_recommendation_ids": previous_ids,
                 "request_type": parsed_intent.request_type.value,
-                "is_surprise": is_surprise
+                "is_surprise": is_surprise,
+                "count": count,
+                "requested_count": explicit_count
             }
             
-            print(f"[ENGINE REQUEST] media_type={media_type.value}, include={constraints.include_genres}, exclude={constraints.exclude_genres}, mood={constraints.mood}, sub_intent={constraints.emotional_sub_intent}, prev_ids={previous_ids}")
+            print(f"[ENGINE REQUEST] media_type={media_type.value}, include={constraints.include_genres}, exclude={constraints.exclude_genres}, mood={constraints.mood}, sub_intent={constraints.emotional_sub_intent}, prev_ids={previous_ids}, count={count}")
             
             # Generate recommendations (handles test mocks, TMDB queries, emotional ranking, and strict exclusion filters)
             recommendations = await self._generate_recommendations(prefs)
             
-            # Honest message override if no recommendations found
+            # Honest message override if no recommendations found or fewer than requested
             response_msg = parsed_intent.response_message
             if not recommendations:
                 if constraints.provider_name:
                     response_msg = f"I couldn't find any titles on {constraints.provider_name} that match those exact filters in your region. Want to adjust the genre or check other services?"
                 else:
                     response_msg = "I couldn't find any titles that match all those filters right now. Want to loosen the criteria or try a different vibe?"
+            elif explicit_count is not None and len(recommendations) < explicit_count:
+                response_msg = f"I could only find {len(recommendations)} title{'s' if len(recommendations) != 1 else ''} matching your criteria instead of the {explicit_count} requested. Here {'is what' if len(recommendations) == 1 else 'are the ones'} I found:"
             
             total_time = time.time() - request_start
             print(f"[RESULTS] Returned {len(recommendations)} recommendations in {total_time*1000:.1f}ms")
@@ -478,8 +486,8 @@ class ScoutService:
         """
         try:
             user_expressed_mood = bool(preferences.get("mood"))
-            mood = preferences.get("mood", "curious")
-            runtime_pref = preferences.get("runtime_preference", "flexible")
+            mood = preferences.get("mood") or "curious"
+            runtime_pref = preferences.get("runtime_preference") or "flexible"
             exclude_genres = preferences.get("exclude_genres", []) or []
             include_genres = preferences.get("include_genres", []) or []
             # Purge any overlapping excluded genres from include_genres to prevent Pydantic ValidationError
@@ -501,6 +509,8 @@ class ScoutService:
             popularity = preferences.get("popularity")
             is_surprise = bool(preferences.get("is_surprise"))
             
+            count = preferences.get("count", 3)
+            
             # Map into RecommendationRequest
             rec_request = RecommendationRequest(
                 media_type=media_type,
@@ -515,7 +525,7 @@ class ScoutService:
                 popularity=popularity,
                 min_year=min_year,
                 max_year=max_year,
-                count=3
+                count=count
             )
             
             # Check if unit test patched recommendations.get_situation_aware_recommendations or discover_movies
@@ -535,7 +545,8 @@ class ScoutService:
                     popularity=popularity,
                     is_surprise=is_surprise,
                     user_expressed_mood=user_expressed_mood,
-                    max_year=max_year
+                    max_year=max_year,
+                    count=count
                 )
                 results.extend(movies)
                 
@@ -547,9 +558,22 @@ class ScoutService:
                     popularity=popularity,
                     is_surprise=is_surprise,
                     user_expressed_mood=user_expressed_mood,
-                    max_year=max_year
+                    max_year=max_year,
+                    count=count
                 )
                 results.extend(tv_results)
+            
+            # Deduplicate by ID
+            seen_ids = set()
+            deduped = []
+            for r in results:
+                rid = r.get("id")
+                if rid and rid not in seen_ids:
+                    seen_ids.add(rid)
+                    deduped.append(r)
+                elif not rid:
+                    deduped.append(r)
+            results = deduped
             
             # Strict final validation against exclusions
             if exclude_genres:
@@ -568,13 +592,15 @@ class ScoutService:
                 tv = [r for r in results if r.get("media_type") == "tv"]
                 if movies and tv:
                     # Provide useful balanced mix of movies and TV series
-                    results = movies[:2] + tv[:1]
+                    half = max(1, count // 2)
+                    other = count - half
+                    results = movies[:half] + tv[:other]
                 else:
-                    results = results[:3]
+                    results = results[:count]
             else:
-                results = results[:3]
+                results = results[:count]
                 
-            return results[:3]
+            return results[:count]
             
         except Exception as e:
             if isinstance(e, ValueError):
@@ -604,10 +630,13 @@ class ScoutService:
         popularity: Optional[str] = None,
         is_surprise: bool = False,
         user_expressed_mood: bool = False,
-        max_year: Optional[int] = None
+        max_year: Optional[int] = None,
+        count: int = 3
     ) -> List[Dict[str, Any]]:
         """Fetch movie recommendations."""
         try:
+            mood = mood or "curious"
+            runtime_pref = runtime_pref or "flexible"
             is_recs_mocked = self._is_mocked(getattr(self.recommendations, "get_situation_aware_recommendations", None))
             is_discover_mocked = self._is_mocked(getattr(self.tmdb, "discover_movies", None))
 
@@ -618,7 +647,7 @@ class ScoutService:
                     occasion="alone",
                     runtime_preference=runtime_pref,
                     excluded_genres=exclude_genres if exclude_genres else None,
-                    count=20
+                    count=max(count * 2, 20)
                 )
                 candidates = res.get("recommendations", [])
             elif is_discover_mocked or (self.tmdb.is_configured and include_genres):
@@ -671,7 +700,23 @@ class ScoutService:
                     params["watch_region"] = watch_region
                     
                 data = await self.tmdb.discover_movies(**params)
-                candidates = data.get("results", [])
+                candidates = list(data.get("results", []))
+                
+                # Paginate if more candidates are needed
+                total_pages = data.get("total_pages", 1)
+                curr_page = page
+                while len(candidates) < count * 2 and curr_page < min(total_pages, curr_page + 3):
+                    curr_page += 1
+                    next_params = dict(params)
+                    next_params["page"] = curr_page
+                    try:
+                        more_data = await self.tmdb.discover_movies(**next_params)
+                        more_results = more_data.get("results", [])
+                        if not more_results:
+                            break
+                        candidates.extend(more_results)
+                    except Exception:
+                        break
             elif self.tmdb.is_configured:
                 # Use situation-aware recommendations
                 if is_surprise and not user_expressed_mood:
@@ -682,7 +727,7 @@ class ScoutService:
                     occasion="alone",
                     runtime_preference=runtime_pref,
                     excluded_genres=exclude_genres if exclude_genres else None,
-                    count=20
+                    count=max(count * 2, 20)
                 )
                 candidates = res.get("recommendations", [])
             else:
@@ -692,7 +737,7 @@ class ScoutService:
                         occasion="alone",
                         runtime_preference=runtime_pref,
                         excluded_genres=exclude_genres if exclude_genres else None,
-                        count=20
+                        count=max(count * 2, 20)
                     )
                     candidates = res.get("recommendations", [])
                 except Exception:
@@ -739,7 +784,7 @@ class ScoutService:
                 filtered.sort(key=lambda x: (x.get("_sub_score", 0), x.get("vote_average", 0)), reverse=True)
             
             movies = []
-            for m in filtered[:3]:
+            for m in filtered[:count]:
                 ctx = {
                     "mood": mood,
                     "include_genres": include_genres,
@@ -783,10 +828,12 @@ class ScoutService:
         popularity: Optional[str] = None,
         is_surprise: bool = False,
         user_expressed_mood: bool = False,
-        max_year: Optional[int] = None
+        max_year: Optional[int] = None,
+        count: int = 3
     ) -> List[Dict[str, Any]]:
         """Fetch TV series recommendations."""
         try:
+            mood = mood or "curious"
             if include_genres:
                 include_genres = self._filter_genres_for_media(include_genres, "tv")
             
@@ -838,7 +885,23 @@ class ScoutService:
             candidates = []
             if is_discover_series_mocked or self.tmdb.is_configured:
                 data = await self.tmdb.discover_series(**params)
-                candidates = data.get("results", [])
+                candidates = list(data.get("results", []))
+                
+                # Paginate if more candidates are needed
+                total_pages = data.get("total_pages", 1)
+                curr_page = page
+                while len(candidates) < count * 2 and curr_page < min(total_pages, curr_page + 3):
+                    curr_page += 1
+                    next_params = dict(params)
+                    next_params["page"] = curr_page
+                    try:
+                        more_data = await self.tmdb.discover_series(**next_params)
+                        more_results = more_data.get("results", [])
+                        if not more_results:
+                            break
+                        candidates.extend(more_results)
+                    except Exception:
+                        break
             else:
                 from services.mock_service import mock_service
                 candidates = mock_service.mock_series
@@ -880,7 +943,7 @@ class ScoutService:
                 filtered.sort(key=lambda x: (x.get("_sub_score", 0), x.get("vote_average", 0)), reverse=True)
                 
             series = []
-            for tv in filtered[:3]:
+            for tv in filtered[:count]:
                 ctx = {
                     "mood": mood,
                     "include_genres": include_genres,

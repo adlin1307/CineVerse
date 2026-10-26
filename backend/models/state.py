@@ -107,6 +107,13 @@ class TemporaryConstraints(BaseModel):
         description="Popularity preference"
     )
     
+    requested_count: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=20,
+        description="Requested recommendation count"
+    )
+    
     @field_validator("include_genres", "exclude_genres")
     @classmethod
     def validate_genre_ids(cls, v: List[int]) -> List[int]:

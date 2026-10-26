@@ -146,6 +146,13 @@ class ParsedIntent(BaseModel):
         description="Popularity preference (low, medium, high)"
     )
     
+    requested_count: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=20,
+        description="Explicit requested recommendation count"
+    )
+    
     # Response generation
     response_message: str = Field(
         ...,

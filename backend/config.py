@@ -32,7 +32,12 @@ class Settings(BaseSettings):
     port: int = 8000
     
     # CORS
-    allowed_origins: Union[List[str], str] = ["http://localhost:5173", "http://localhost:3000"]
+    allowed_origins: Union[List[str], str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
     allow_origin_regex: Optional[str] = r"https://.*\.vercel\.app|https://.*\.onrender\.com|https://.*\.netlify\.app"
 
     @field_validator("allowed_origins", mode="before")

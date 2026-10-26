@@ -234,6 +234,7 @@ Parse the user's message into a structured JSON object matching this schema:
   "runtime_preference": "under_90|90_to_130|flexible|null",
   "language": null,
   "popularity": "low|medium|high|null",
+  "requested_count": null,
   "referenced_title_index": null,
   "response_message": "your natural conversational response",
   "clarification_needed": null,
@@ -332,11 +333,55 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
         data["raw_user_message"] = user_message
         data["parser_used"] = "llm"
         
+        # Ensure explicit count from user message is respected if LLM missed it
+        if "requested_count" not in data or data.get("requested_count") is None:
+            data["requested_count"] = self._extract_requested_count(user_message.lower())
+        
         # Validate with Pydantic
         try:
             return ParsedIntent(**data)
         except ValidationError as e:
             raise ValueError(f"LLM response failed validation: {e}")
+    
+    @staticmethod
+    def _extract_requested_count(message_lower: str) -> Optional[int]:
+        """
+        Extract explicit requested recommendation count from user message.
+        Examples:
+        - "Recommend 1 movie" -> 1
+        - "Give me 5 suggestions" -> 5
+        - "Suggest 10 comedy movies" -> 10
+        - "Give me 3 underrated mystery movies" -> 3
+        """
+        word_to_num = {
+            "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+            "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+            "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+            "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19, "twenty": 20,
+            "single": 1
+        }
+        
+        num_pattern = r"(?:[1-9]|1\d|20|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|single)"
+        
+        # Pattern A: (number) (optional adjectives) (movies/films/shows/series/recommendations/suggestions/titles/picks)
+        match = re.search(r"\b(" + num_pattern + r")\s+(?:[\w-]+\s+){0,3}(?:movies?|films?|shows?|series|recommendations?|suggestions?|titles?|picks?|options?)\b", message_lower)
+        if match:
+            raw = match.group(1).lower()
+            return word_to_num.get(raw, int(raw) if raw.isdigit() else None)
+            
+        # Pattern B: (recommend|suggest|show|give me|find|top|list|pick|provide) (number)
+        match = re.search(r"\b(?:recommend|suggest|show|give\s+me|find|top|list|pick|provide)\s+(?:me\s+)?(" + num_pattern + r")\b", message_lower)
+        if match:
+            raw = match.group(1).lower()
+            return word_to_num.get(raw, int(raw) if raw.isdigit() else None)
+            
+        # Pattern C: (just|only) (number)
+        match = re.search(r"\b(?:just|only)\s+(" + num_pattern + r")\b", message_lower)
+        if match:
+            raw = match.group(1).lower()
+            return word_to_num.get(raw, int(raw) if raw.isdigit() else None)
+
+        return None
     
     def _parse_deterministic(
         self,
@@ -461,6 +506,7 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             runtime_preference=runtime_pref,
             language=language,
             popularity=popularity,
+            requested_count=self._extract_requested_count(message_lower),
             referenced_title_name=similar_title,
             response_message=response_msg,
             raw_user_message=user_message,

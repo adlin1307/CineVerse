@@ -11,16 +11,6 @@ class TMDBService:
         self.image_base_url = "https://image.tmdb.org/t/p/"
         self._api_key_override = None
         
-    @property
-    def api_key(self) -> str:
-        if self._api_key_override is not None:
-            return self._api_key_override
-        return settings.tmdb_api_key
-        
-    @property
-    def is_configured(self) -> bool:
-        return bool(self.api_key and self.api_key != "your_api_key_here")
-        
         # Configure timeouts and limits to prevent connection issues
         self.timeout = httpx.Timeout(
             connect=10.0,  # 10 seconds to establish connection
@@ -37,6 +27,16 @@ class TMDBService:
         
         # Create a persistent client (reused across requests)
         self._client: Optional[httpx.AsyncClient] = None
+        
+    @property
+    def api_key(self) -> str:
+        if self._api_key_override is not None:
+            return self._api_key_override
+        return settings.tmdb_api_key
+        
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_key and self.api_key != "your_api_key_here")
     
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the HTTP client."""
@@ -52,6 +52,7 @@ class TMDBService:
         """Close the HTTP client."""
         if self._client is not None and not self._client.is_closed:
             await self._client.aclose()
+        self._client = None
     
     async def _make_request(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Make a request to TMDB API with proper error handling and retry logic."""

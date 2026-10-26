@@ -19,8 +19,12 @@ async def get_popular_series(page: int = Query(1, ge=1, le=500)):
         data = await service.get_popular_series(page=page)
         return data
     except Exception as e:
-        print(f"[ERROR] Popular series failed: {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve popular series. Please try again later.")
+        print(f"[WARN] Popular series from TMDB failed: {type(e).__name__}: {str(e)}. Falling back to mock data.")
+        try:
+            return await mock_service.get_popular_series(page=page)
+        except Exception:
+            raise HTTPException(status_code=500, detail="Failed to retrieve popular series. Please try again later.")
+
 
 
 @router.get("/discover")
