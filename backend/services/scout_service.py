@@ -228,7 +228,8 @@ class ScoutService:
                 "max_year": constraints.max_year,
                 "previous_recommendation_ids": previous_ids,
                 "request_type": parsed_intent.request_type.value,
-                "is_surprise": is_surprise
+                "is_surprise": is_surprise,
+                "count": constraints.count or 5
             }
             
             print(f"[ENGINE REQUEST] media_type={media_type.value}, include={constraints.include_genres}, exclude={constraints.exclude_genres}, mood={constraints.mood}, sub_intent={constraints.emotional_sub_intent}, prev_ids={previous_ids}")
@@ -500,6 +501,7 @@ class ScoutService:
             tone_modifiers = preferences.get("tone_modifiers", [])
             popularity = preferences.get("popularity")
             is_surprise = bool(preferences.get("is_surprise"))
+            requested_count = preferences.get("count") or 5
             
             # Map into RecommendationRequest
             rec_request = RecommendationRequest(
@@ -515,7 +517,7 @@ class ScoutService:
                 popularity=popularity,
                 min_year=min_year,
                 max_year=max_year,
-                count=3
+                count=requested_count
             )
             
             # Check if unit test patched recommendations.get_situation_aware_recommendations or discover_movies
@@ -529,25 +531,29 @@ class ScoutService:
             
             if fetch_movies:
                 movie_genres = self._filter_genres_for_media(include_genres, "movie")
+                movie_fetch_count = requested_count if media_type == MediaType.MOVIE else max(requested_count // 2 + 1, 2)
                 movies = await self._fetch_movies(
                     mood, runtime_pref, exclude_genres, movie_genres, min_year, provider_id, watch_region, sub_intent,
                     previous_ids if is_refinement else None,
                     popularity=popularity,
                     is_surprise=is_surprise,
                     user_expressed_mood=user_expressed_mood,
-                    max_year=max_year
+                    max_year=max_year,
+                    count=movie_fetch_count
                 )
                 results.extend(movies)
                 
             if fetch_tv:
                 tv_genres = self._filter_genres_for_media(include_genres, "tv")
+                tv_fetch_count = requested_count if media_type == MediaType.TV else max(requested_count // 2, 2)
                 tv_results = await self._fetch_tv_series(
                     mood, exclude_genres, tv_genres, min_year, provider_id, watch_region, sub_intent,
                     previous_ids if is_refinement else None,
                     popularity=popularity,
                     is_surprise=is_surprise,
                     user_expressed_mood=user_expressed_mood,
-                    max_year=max_year
+                    max_year=max_year,
+                    count=tv_fetch_count
                 )
                 results.extend(tv_results)
             
@@ -567,14 +573,16 @@ class ScoutService:
                 movies = [r for r in results if r.get("media_type") == "movie"]
                 tv = [r for r in results if r.get("media_type") == "tv"]
                 if movies and tv:
-                    # Provide useful balanced mix of movies and TV series
-                    results = movies[:2] + tv[:1]
+                    # Provide useful balanced mix of movies and TV series up to requested count
+                    movie_take = max(requested_count // 2 + 1, 1)
+                    tv_take = max(requested_count - movie_take, 1)
+                    results = movies[:movie_take] + tv[:tv_take]
                 else:
-                    results = results[:3]
+                    results = results[:requested_count]
             else:
-                results = results[:3]
+                results = results[:requested_count]
                 
-            return results[:3]
+            return results[:requested_count]
             
         except Exception as e:
             if isinstance(e, ValueError):
@@ -604,7 +612,8 @@ class ScoutService:
         popularity: Optional[str] = None,
         is_surprise: bool = False,
         user_expressed_mood: bool = False,
-        max_year: Optional[int] = None
+        max_year: Optional[int] = None,
+        count: int = 5
     ) -> List[Dict[str, Any]]:
         """Fetch movie recommendations."""
         try:
@@ -739,7 +748,7 @@ class ScoutService:
                 filtered.sort(key=lambda x: (x.get("_sub_score", 0), x.get("vote_average", 0)), reverse=True)
             
             movies = []
-            for m in filtered[:3]:
+            for m in filtered[:count]:
                 ctx = {
                     "mood": mood,
                     "include_genres": include_genres,
@@ -783,7 +792,8 @@ class ScoutService:
         popularity: Optional[str] = None,
         is_surprise: bool = False,
         user_expressed_mood: bool = False,
-        max_year: Optional[int] = None
+        max_year: Optional[int] = None,
+        count: int = 5
     ) -> List[Dict[str, Any]]:
         """Fetch TV series recommendations."""
         try:
@@ -880,7 +890,7 @@ class ScoutService:
                 filtered.sort(key=lambda x: (x.get("_sub_score", 0), x.get("vote_average", 0)), reverse=True)
                 
             series = []
-            for tv in filtered[:3]:
+            for tv in filtered[:count]:
                 ctx = {
                     "mood": mood,
                     "include_genres": include_genres,

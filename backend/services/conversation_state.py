@@ -103,7 +103,8 @@ class ConversationStateMachine:
             max_year=intent.max_year,
             runtime_preference=intent.runtime_preference,
             language=intent.language,
-            popularity=intent.popularity
+            popularity=intent.popularity,
+            count=intent.count
         )
         
         # Update state - clear previous constraints
@@ -172,6 +173,10 @@ class ConversationStateMachine:
             constraints.language = intent.language
         if intent.popularity:
             constraints.popularity = intent.popularity
+        if intent.count:
+            constraints.count = intent.count
+        if intent.count:
+            constraints.count = intent.count
         
         current_state.record_transition(StateTransition.APPLY_REFINEMENT, intent.parser_used)
         
@@ -219,6 +224,8 @@ class ConversationStateMachine:
             constraints.provider_id = intent.provider_id
         if intent.provider_name:
             constraints.provider_name = intent.provider_name
+        if intent.count:
+            constraints.count = intent.count
         
         current_state.record_transition(StateTransition.APPLY_CONSTRAINT, intent.parser_used)
         

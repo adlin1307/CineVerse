@@ -234,6 +234,7 @@ Parse the user's message into a structured JSON object matching this schema:
   "runtime_preference": "under_90|90_to_130|flexible|null",
   "language": null,
   "popularity": "low|medium|high|null",
+  "count": 5,
   "referenced_title_index": null,
   "response_message": "your natural conversational response",
   "clarification_needed": null,
@@ -313,10 +314,16 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             for k in [
                 "include_genres", "exclude_genres", "mood", "runtime_preference",
                 "min_year", "max_year", "popularity", "media_type",
-                "provider_id", "provider_name", "watch_region", "emotional_sub_intent"
+                "provider_id", "provider_name", "watch_region", "emotional_sub_intent", "count"
             ]:
                 if k in prefs and (k not in data or data[k] is None):
                     data[k] = prefs[k]
+
+        # Fallback count extraction if LLM omitted count
+        if "count" not in data or data["count"] is None:
+            extracted_cnt = self._extract_count(user_message.lower())
+            if extracted_cnt is not None:
+                data["count"] = extracted_cnt
 
         # Add required fields if missing
         if "response_message" not in data or not data["response_message"]:
@@ -415,10 +422,11 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             if tone_mood and not mood:
                 mood = tone_mood
         
-        # 11. Detect runtime, popularity & release years
+        # 11. Detect runtime, popularity, release years & requested count
         runtime_pref = self._extract_runtime(message_lower)
         popularity = self._extract_popularity(message_lower)
         min_year, max_year = self._extract_year_range(message_lower)
+        count = self._extract_count(message_lower)
         
         # 12. Detect request type
         request_type = self._detect_request_type(
@@ -461,6 +469,7 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             runtime_preference=runtime_pref,
             language=language,
             popularity=popularity,
+            count=count,
             referenced_title_name=similar_title,
             response_message=response_msg,
             raw_user_message=user_message,
@@ -1048,6 +1057,23 @@ Respond ONLY with valid JSON. No markdown backticks outside, no extra text."""
             modifiers.append('intense')
         return modifiers
     
+    def _extract_count(self, message_lower: str) -> Optional[int]:
+        """Extract requested recommendation count (e.g., 'top 5', '5 movies', 'three shows')."""
+        word_to_num = {
+            'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+            'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
+        }
+        m = re.search(
+            r'\b(?:top\s+)?(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\b'
+            r'(?:\s+(?:more\s+)?(?:[\w\s-]{0,20})?(?:movies?|films?|series|shows?|picks?|recommendations?|titles?)|(?:\s+more\b))',
+            message_lower
+        )
+        if m:
+            val = m.group(1)
+            cnt = int(val) if val.isdigit() else word_to_num.get(val, 5)
+            return min(max(cnt, 1), 20)
+        return None
+
     def _extract_runtime(self, message_lower: str) -> Optional[str]:
         """Extract runtime preference with natural time phrase normalization."""
         under_90_patterns = [
